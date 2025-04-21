@@ -1,6 +1,7 @@
 # Golden Kubestronaut
 
 Certifications needed:
+
 * CBA: Certified Backstage Associate
 * CCA: Cilium Certified Associate
 * KCA: Kyverno Certified Associate
@@ -9,5 +10,3 @@ Certifications needed:
 * PCA: Prometheus Certified Associate
 * CAPA: Certified Argo Project Associate
 * ICA: Istio Certified Associate
-
-
