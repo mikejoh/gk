@@ -162,13 +162,12 @@ The endpoint ID is an internal id that Cilium assigns to all endpoints on a clus
 All endpoints are assigned an identity, the identity is what is used **to enforce basic connectivity between endpoints**. Equvialent to L3 enforcement. An identity is **identified by Labels and is given a cluster wide unique identifier**.
 
 Examples on special identities:
+
 * `reserved:unknown` - identity could not be derived.
 * `reserved:host` - Local host.
 * `reserved:world` - Any network endpoint **outside** of the cluster.
 
 Well known identities are a set of identities that Cilium is aware of automatically. E.g. `kube-dns`, `core-dns` etc.
-
-
 
 </details>
 
@@ -181,6 +180,69 @@ Well known identities are a set of identities that Cilium is aware of automatica
 * Policy Rule Structure
 * Kubernetes Network Policies versus Cilium Network Policies
 
+## Identity Based security
+
+Security is based on the identity of a pod, which is derived through labels. This identity can be shared between pods. Subsequent starts of additional Pods with `role=frontend` only requires resolving the identity via a key-value store. Nothing needs to be done on cluster nodes.
+
+## Policy Enforcement
+
+All security policies are described assuming **stateful policy enforcements for session based protocols**. The intent of the policy is to **describe allowed direction** of connection establishment.
+
+If policy shows `A=>B` then reply packets from B to A are automatically allowed.
+
+Policies can be enforced at _ingress_ or _egress_.
+
+For ingress this means that each cluster node verifies all incoming packets and determines wheter the packet is allowed or to be transmitted to the intended endpoint. Same with egress.
+
+In order to **enforce** identity based security in a multi host cluster the identity of the transmitting endpoint is embedded into every network packet. The receiving node can then extract the identity
+
+If no policy is loaded, the default behavior is to **allow all communication** unless policy enforcement has been explicitly enabled. As soon as the first policy rule is loaded then policy enforcement is enabled and any communication must then be white listed or the relevant packets will be dropped.
+
+### Modes
+
+`default`- endpoints have unrestricted network access until selected by policy.
+
+`always` - policy enforcement is always on even if no rules select endpoints.
+
+`never` - policy enforcement disabled on all endpoints.
+
+When an endpoint is selected by a network policy, it transitions to a default-deny state where only **explicitly allowed** traffic is permitted.
+
+## Network Policies
+
+Standard `NetworkPolicy` supports L3 and L4 at ingress or egress of the Pod.
+
+The extended `CiliumNetworkPolicy` supports policies at L3-7 for both ingress and egress.
+
+The `CiliumClusterWideNetworkPolicy` is a cluster-scoped CRD, same as `CuliumNetworkPolicy` but no `namespace` specified.
+
+`ipBlock` feature is missing in Kubernetes Network Policy.
+
+`CiliumNetworkPolicy` allows for extended functionality, if this functionality get into the `NetworkPolicy` the Cilium one may not be needed.
+
+All policy rules are based upon a **whitelist** model, that is, each rule in the policy allows traffic that matches the rule. If **two rules** exists the broades traffic match will be the one that is used.
+
+If both **ingress** and **egress** are omitted, the rule has no effect!
+
+Layer 3 policies can be specified using the following **methods**:
+
+* Endpoints based - an empty Endpoint Selector will select all endpoints.
+* Services based - `toServices`
+* Entity based - `toEntities` and `fromEntities`
+  * `host` - Includes the local host, also containers running in network mode host.
+  * `remote-node` - Any node in any of the connect clusters **other** than the local host.
+  * `kube-apiserver`
+  * `ingress` - Cilium Envoy instance that handles L7 traffc.
+  * `cluster` - All network endpoints inside of the local cluster.
+  * `init` - All endpoints in bootstrap phase which the security identiy has not been resolved yet.
+  * `health` - Health endpoints, used to check cluster connectivity.
+  * `unmanaged` - Not managed by Cilium.
+  * `world` - All endpoints outside of the cluster.
+  * `all` - All known clusters as well world and whitelists all communication.
+* Node based
+* IP/CIDR based
+* DNS based
+
 </details>
 
 <details>
@@ -191,6 +253,118 @@ Well known identities are a set of identities that Cilium is aware of automatica
 * Understand the Benefits of Gateway API over Ingress
 * Encrypting Traffic in Transit with Cilium
 * Sidecar-based versus Sidecarless Architectures
+
+## Service Mesh
+
+The requirements has not changed since way back:
+
+* Application should be able to (safely) communicate over untrusted networks
+* Load-balancing
+* Resiliency
+* Authenticate each other's identity
+
+A service mesh extract these features out of the application an offers them as part of the infrastructure.
+
+All in all a Service Mesh is:
+
+* Observability
+* Ingress
+  * Load Balacing (North-South)
+* L7 traffic management - East-West, service load balancing
+  * Rules (canary rollouts)
+* Identity based security
+
+Why are you interested in Cilium Service Mesh?
+
+* Reducing operational complexity
+* Reduced resource usage
+* Better performance
+* Avoid sidecar start-up/shut-down race conditions
+
+eBPF can **inject the proxy directly at the socket level**, keeping paths short. In the case of Cilium, Envoy is used although from an architecture perspective any proxy could be integrated into this model.
+
+### Sidecar vs per-Node proxy
+
+![alt text](image-1.png)
+![alt text](image-2.png)
+![alt text](image-3.png)
+
+Running a sidecar in each workload can result in a large number of proxies. Each proxy maintains data structures such as routing and endpoint tables:
+
+![alt text](image-4.png)
+
+Multi-tenancy is solved in a per-Node proxy model, the proxy will serve connections for multiple applications:
+
+![alt text](image-5.png)
+
+## Ingress
+
+Cilium usses the standard Kubernetes Ingress resource definition with an `ingressClassName` of `cilium`. Can be used for path-routing and for TLS termination.
+
+_The ingress controller creates a Service of `LoadBalancer` type, so your environment will need to support this._
+
+Cilium allows you to create a load balancer in two modes: `dedicated` and `shared`.
+
+Requirements:
+
+* Cilium to be configured with NodePort enabled OR by enabling kube-proxy replacement
+* Cilium must be configured with the L7 proxy enabled using `l7Proxy=true`
+* Ingress controller creates a Service of type `LoadBalancer`
+
+Install the `hubble` CLI to get som more insights in the traffic.
+
+### Cilium Ingress and Gateway API vs other Ingress controllers
+
+* For Cilium, Ingress and Gateway API are part of the networking stack, and so behaves in a different way to other Ingress or Gateway API controllers.
+* Other Ingress or Gateway API controllers are generally installed as a Deployment or DaemonSet
+* Ciliums Ingress and Gateway API config is exposed witha a Loadbalancer or NodePort service, or the host network. When traffic **arrives at the Service's port, eBPF forwards this to Enviy (using TPROXY kernel facility)**. This changes the *_visbility_ of headers etc. from how other controllers does this.
+
+Ingress and Gateway API traffic bound to backend services via Cilium passes through a per-node Envoy proxy, the per-node proxy has special code to allow it to interact with eBPF policy engine making Envoy a network policy enforcer point.
+
+After ingress traffic arrives at the Envoy the traffic are assigned the special `ingress` identity, there's two logical policy enforcement points in Cilium ingress: `world` and `ingress`.
+
+### Source IP visibility
+
+By default Envoy adds the visible source address of incoming HTTP connection to the `X-Forwarded-For` header. There's also the `X-Envoy-External-Address`.
+
+### `externalTrafficPolicy` for LoadBalancer or NodePort services
+
+Relevant for Client IP visibility.
+
+There's two settings:
+
+* `Local` - Only route traffic to Pods running on the local node, **without masquerading the source IP**.
+* `Cluster` - Node will route to all endpoints across the cluster evenly. This may mean that the backend Pod does **not** see the source IP.
+
+In Cilium this works a bit differently: In both `externalTrafficPolicy` cases, traffic will arrive at any node in the cluster, and be forwarded to Envoy while keeping the source IP intact.
+
+### Ingress Path Types and precedence
+
+There's three types of paths:
+
+* **Exact** - match the given path exactly
+* **Prefix** - match the URL path prefix split by `/`
+* **ImplementationSpecific** - Up to the IngressClass. In the Cilium case they've defined that as `Regex`.
+
+When multiple path types are configured on an Ingress object, Cilium will configure Envoy with matches in the following order:
+
+1. Exact
+2. ImplementationSpecific
+3. Prefix
+4. The `/` Prefix match has special handling and always goes last.
+
+## Gateway API
+
+Gateway API is a Kubernetes **SIG-Network subproject to design a successor for the Ingress object.**.
+
+It's designed to be:
+
+* Role-oriented
+* Portable
+* Expressive
+* Extensible
+
+![alt text](image-6.png)
 
 </details>
 
