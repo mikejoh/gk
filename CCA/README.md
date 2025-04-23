@@ -269,7 +269,7 @@ All in all a Service Mesh is:
 
 * Observability
 * Ingress
-  * Load Balacing (North-South)
+  * Load Balancing (North-South)
 * L7 traffic management - East-West, service load balancing
   * Rules (canary rollouts)
 * Identity based security
@@ -366,6 +366,18 @@ It's designed to be:
 
 ![alt text](image-6.png)
 
+Cilium are Gateway API compatible since all core conformance tests are passed.
+
+Requirements:
+
+* Cilium must be configured with NodePort enabled OR by enabling the kube-proxy replacement
+* L7 proxy enabled
+* Install Gateway API CRDs
+
+### GAMMA (Gateway API for Mesh Management and Administration)
+
+Is for the east/west inter-service traffic in the same cluster.
+
 </details>
 
 <details>
@@ -375,6 +387,33 @@ It's designed to be:
 * Enabling Layer 7 Protocol Visibility
 * Know How to Use Hubble from the Command Line or the Hubble UI
 
+Hubble is the observability layer of Cilium.
+
+Hubble is able to provide visibility at the node level, cluster level or even across clusters in Cluster Mesh.
+
+Hubble operates at the scope of the individual node on which the Cilium agent runs.
+
+Hubble relay adds network visibility for the entire cluster or even multiple clusters (Cluster Mesh).
+
+Hubble UI is a web interface.
+
+## Layer 7 visibility
+
+To monitor the datapath state you can use `cilium-dbg monitor --type drop`. By default the inspection only works on L3/L4 packets. If you want L7 protocol visibility you can use L7 network policies.
+
+Monitoring L7 traffic involves security considerations for handling potentially sensitive information.
+
+To harde security Cilium provides the `--hubble-redact-enabled` option to handle sensitive information present in L7 flows.
+
+DNS visibility is only available on egress only.
+
+CLI examples using `hubble`:
+
+```
+hubble observe --pod deathstar --protocol http
+hubble observe --pod deathstar --verdict DROPPED
+```
+
 </details>
 
 <details>
@@ -382,6 +421,18 @@ It's designed to be:
 
 * Know How to Use Cilium CLI to Query and Modify the Configuration
 * Using Cilium CLI to Install Cilium, Run Connectivity Tests, and Monitor its Status
+
+For clusters with more than 500 nodes you might want to run specific datapath nodes!
+
+Install the `cilium` CLI:
+* Download directly with util script
+* git clone
+
+`cilium status` gives us the current overall status.
+
+`cilium status --wait`
+
+`cilium connectivity test` - run network connectivity test
 
 </details>
 
@@ -391,6 +442,52 @@ It's designed to be:
 * Understand the Benefits of Cluster Mesh for Multi-cluster Connectivity
 * Achieve Service Discovery and Load Balancing Across Clusters with Cluster Mesh
 
+Multi-cluster or Cluster Mesh extends the networking datapath across multiple clusters. It allows endpoints in all connected clusters to communicate while providing full policy enforcement.
+
+Pre-req:
+* All clusters must be running the same datapath mode, `encapsulation` or `native-routing`.
+* PodCIDR ranges in all cluster must be non-conflicting.
+* IP connectivity between eachother using InternalIP for each node is needed.
+* The network between clusters must allow the inter-cluster communication via FWs.
+
+Max 255 clusters!
+
+Changing the cluster ID can be done in a running cluster with live workload, but all workloads needs to e restarted since the security identity is created using the id.
+
+to get Hubble Relay to work you'll need to move the CA certificate around.
+
+```
+cilium clustermesh enable --context $CLUSTER1
+cilium clustermesh enable --context $CLUSTER2
+```
+
+```
+cilium clustermesh connect --context $CLUSTER1 --destination-context $CLUSTER2
+```
+
+Test connectivity:
+```
+cilium connectivity test --context $CLUSTER1 --multi-cluster $CLUSTER2
+```
+
+### KVStoreMesh
+
+KVStoreMesh is an extenstion of Cluster Mesh, it caches the information obtained from the remote cluster in a local kvstore, such as etcd.
+
+This is different from vanilla Cluster Mesh where each agent directly pulls the information from the remote clusters.
+
+Since 1.16 this is enabled by default.
+
+### Load balancing
+
+Use the annotation `service.cilium.io/global: "true"` to declare a identical service in identical namespaces across multiple clusters as global.
+
+Loadbalancing will automatically be performed across clusters.
+
+### Exporting a Service
+
+To export a service you should create a `ServiceExport` resource. As a result your Service will be exported to all clusters, provided that the Service Namespace is present on those clusters.
+
 </details>
 
 <details>
@@ -399,6 +496,8 @@ It's designed to be:
 * Understand the Role of eBPF in Cilium
 * eBPF Key Benefits
 * eBPF-based Platforms versus IPtables-based Platforms
+
+
 
 </details>
 
