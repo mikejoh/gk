@@ -425,6 +425,7 @@ hubble observe --pod deathstar --verdict DROPPED
 For clusters with more than 500 nodes you might want to run specific datapath nodes!
 
 Install the `cilium` CLI:
+
 * Download directly with util script
 * git clone
 
@@ -445,6 +446,7 @@ Install the `cilium` CLI:
 Multi-cluster or Cluster Mesh extends the networking datapath across multiple clusters. It allows endpoints in all connected clusters to communicate while providing full policy enforcement.
 
 Pre-req:
+
 * All clusters must be running the same datapath mode, `encapsulation` or `native-routing`.
 * PodCIDR ranges in all cluster must be non-conflicting.
 * IP connectivity between eachother using InternalIP for each node is needed.
@@ -466,6 +468,7 @@ cilium clustermesh connect --context $CLUSTER1 --destination-context $CLUSTER2
 ```
 
 Test connectivity:
+
 ```
 cilium connectivity test --context $CLUSTER1 --multi-cluster $CLUSTER2
 ```
@@ -497,7 +500,56 @@ To export a service you should create a `ServiceExport` resource. As a result yo
 * eBPF Key Benefits
 * eBPF-based Platforms versus IPtables-based Platforms
 
+The Extended Berkely Packet Filter, filtering network packets, the extended part of the name also means that it can be used to so much more than just packet filtering.
 
+It's primarily a _framework_ that allows users to load and run custom programs within the kernel. Which means it can _extend_ or even _modify_ the way the kernel behaves.
+
+eBPF enables us to collect customized information about an app without having to change the app itself.
+
+Watching or observing an application from the kernel perspective is not new, we've had `perf` for a while.
+
+eBPF programming is powerful but complex.
+
+## The Kernel and eBPF
+
+The kernel is a software layer between your applications and the hardware they're running on. Applications run in an unprivileged layer called user space. Apps cannot access hardware directly. This is done through syscalls.
+
+It's hard to get changes into the kernel.
+
+You can always write your own module, these can be loaded and unloaded on demand. The challenge here is that this is still full-on kernel programming.
+
+eBPF allows us to run arbitrary code in the kernel, the _verifier_ analyzes an eBPF program to ensure that regardless of input it will always terminate safely.
+
+eBPF programs can be loaded into the kernel dynamically. The kernel accepts eBPF programs in _bytecode_ form. The program itself is typically written in C or Rust and compiled into an object file.
+
+![alt text](image-7.png)
+
+## Network Interfaces
+
+XDP allows attaching an eBPF program to a network interface, so that it is triggered whenever a packet is received on that interface. It can inspect the packet and the exit code can tell the kernel what to do with that packet.
+
+eBPF Maps, maps are datastructures that are defined alongside eBPF programs. key-value stores. Common uses for maps include:
+* eBPF program writing metrics
+* User space code writing configuration information
+* An eBPF program writing data into a map for later retreival by another eBPF program
+
+![alt text](image-8.png)
+
+## Tuning
+
+### eBPF host routing
+
+Even when network routing is performed by Cilium using eBPF, by default network packets still traverse some parts of the regular network stack of the node. To ensure packets traverses all of the iptables hooks in case you depend on them.
+
+With `cilium status` you should see Host Routing set to `BPF`.
+
+### IPv4 BIG TCP
+
+Allows the network stack to prepare larger GSO (tx) and GRO (rx) packets to reduce the number of time the stack is traversed which improves performance!
+
+### Bandwidth Manager
+
+Responsible for managing network traffic more efficiently.
 
 </details>
 
