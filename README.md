@@ -5,7 +5,7 @@ Certifications needed to become a Golden Kubestronaut besides the first five (KC
 * CBA (Certified Backstage Associate)
 * [CCA (Cilium Certified Associate)](CCA/README.md)
 * KCA (Kyverno Certified Associate)
-* CGOA (Certified GitOps Associate)
+* [CGOA (Certified GitOps Associate)](CGOA/README.md)
 * OTCA (OpenTelemetry Certified Associate)
 * PCA (Prometheus Certified Associate)
 * CAPA (Certified Argo Project Associate)
