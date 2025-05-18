@@ -1,0 +1,19 @@
+singleNamespace: false
+
+workflow:
+  serviceAccount:
+    create: true
+    name: "argo-workflow"
+
+controller:
+  parallelism: 2
+  metricsConfig:
+    enabled: true
+  persistence: {}
+  workflowDefaults: {}
+
+  logging:
+    level: info
+    globallevel: "0"
+    format: "text"
+

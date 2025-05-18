@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wf-user
+  namespace: argo-workflows
+---
+# Namespaced access to workflows.argoproj.io
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflows-access
+  namespace: argo-workflows
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wf-user-argo-workflows-binding
+  namespace: argo-workflows
+subjects:
+  - kind: ServiceAccount
+    name: wf-user
+    namespace: argo-workflows
+roleRef:
+  kind: Role
+  name: argo-workflows-access
+  apiGroup: rbac.authorization.k8s.io
+---
+# Cluster-wide access to all other Argo CRDs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-all-crds-access
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources:
+      - clusterworkflowtemplates
+      - cronworkflows
+      - workflowartifactgctasks
+      - workfloweventbindings
+      - workflowtaskresults
+      - workflowtasksets
+      - workflowtemplates
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wf-user-clusterrolebinding
+subjects:
+  - kind: ServiceAccount
+    name: wf-user
+    namespace: argo-workflows
+roleRef:
+  kind: ClusterRole
+  name: argo-all-crds-access
+  apiGroup: rbac.authorization.k8s.io
+
