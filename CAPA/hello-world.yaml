@@ -1,0 +1,32 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: hello-world-
+  namespace: argo-workflows
+spec:
+  serviceAccountName: wf-user
+  entrypoint: hello-world
+  templates:
+    - name: hello-world
+      container:
+        image: busybox
+        command: [echo]
+        args: ["hello world"]
+    - name: gen-random-int
+      script:
+        image: python:alpine3.6
+        command: [python]
+        source: |
+          import random
+          i = random.randint(1, 100)
+          print(i)
+    - name: k8s-owner-reference
+      resource:
+        action: create
+        manifest: |
+          apiVersion: v1
+          kind: ConfigMap
+          metadata:
+            generateName: owned-eg-
+          data:
+            some: value

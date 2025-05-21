@@ -58,4 +58,26 @@ roleRef:
   kind: ClusterRole
   name: argo-all-crds-access
   apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-workflows-global
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs: ["*"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wf-user-global-workflows-binding
+subjects:
+  - kind: ServiceAccount
+    name: wf-user
+    namespace: argo-workflows
+roleRef:
+  kind: ClusterRole
+  name: argo-workflows-global
+  apiGroup: rbac.authorization.k8s.io
 
