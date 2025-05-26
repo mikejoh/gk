@@ -74,7 +74,100 @@ There are six types of templates, divided into two categories:
     * Inner lists will run in parallel
   * **DAG** - Define tasks as a graph of dependencies. In a DAG, you list all your tasks and set which other tasks must complete before a particular task can begin. Tasks without any dependencies will run in immedately.
 
+DAG = specify dependencies and allow for maxiumu parallelism.
 
+## Workflows
+
+The structure of Workflow Specs:
+
+* Kubernetes header including meta-data
+* Spec body
+  * Entrypoint
+  * List of template definitions
+* For each template
+  * Name
+  * Inputs
+  * Outputs
+  * Container Invocation or a list of steps
+    * For each step, a template invocation
+
+`ClusterWorkflowTemplates` are cluster-scoped `WorkflowTemplates` that can be created cluster scped like a `ClusterRole`.
+
+```
+clusterScope: true
+```
+
+Indicates that the template is cluster-scoped.
+
+## Artifacts
+
+Are packaged as tarbals and gzipped by default. Skip by specifying `archive.none=false`.
+
+Artifact garbae collection for artifacts you dont need can be done with `OnWorkflowCompletion` or `OnWorkflowDeletion`.
+
+Strategies:
+`artifactGC.strategy=Never`, set the strategy in the spec to make it global.
+
+```
+...
+  artifactGC:
+    strategy: OnWorkflowDeletion
+    forceFinalizerRemoval: true
+...
+```
+
+Hardwired Artifacts are static explicitly defined artifacts.
+
+Condsider parameterizing your S3 keys by `workflow.uid` in case you have concurrent workflows of the same spec.
+
+You can set a specific `serviceAccountName` for to override the service account used to access S3.
+
+`artifactRepositoryRef` is used to specify the repository to use for the artifact. This is a reference to a `ConfigMap` or `Secret` that contains the configuration for the artifact repository.
+
+## Service Accounts
+
+In order for Argo to support features such as artifacts, outputs, access to secrets, etc. It needs to communicate with Kubernetes resources using the KAPI.
+
+```
+argo submit --serviceaccount <name> <workflow.yaml>
+```
+
+All Pods in a workflow run with the service account specified in the `workflow.spec.serviceAccountName` field. If omitted the default service account of the namespace is used.
+
+It depends on how much access a workflow needs in the cluster.
+
+For a executor to function properly we'll need:
+
+* create
+* patch
+
+on `workflowtaskresults`.
+
+## Variables
+
+Template Tag kinds:
+
+* simple (default) e.g. `{{workflow.name}}`
+* expression e.g. `{{=workflow.name}}`
+
+## Retry policies
+
+Set under `spec.templates.retryStrategy`:
+
+* `Always` - always retry
+* `OnFailure` - retry steps whose main container is marked as failed in Kubernetes
+* `OnError` - retry steps that encounter Argo controller errors, or whose init or way containers fail
+* `OnTransientError` - retry steps that encounter errors defined as transient.
+
+## Lifecycle Hooks
+
+Triggers an actions based on a conditional expression or on completion of a step or template. On workflow or template level.
+
+## Step Level memoization
+
+Workflows ofthen have outputs that are expensive to compute. Memoization reduces cost and mworkflow execution time by reading the results of previous executions of the same step.
+
+It stores the output of a template into a specfied cache.
 
 </details>
 
