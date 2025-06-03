@@ -5,6 +5,7 @@ _This exam is an online, proctored, multiple-choice exam._
 ## Resources
 
 * <https://argo-workflows.readthedocs.io/en/stable/>
+* <https://paulyu.dev/article/capa-study-guide/>
 
 ## Topics
 
@@ -57,18 +58,22 @@ The internals of a step Pod are:
 There are six types of templates, divided into two categories:
 
 * Work to be done:
-  * **Container** - The most common template type. The spec is the same as the one of a container spec in Kubernetes.
-  * **Script** - Convenience wrapper around a `container`. The spec is the same as for a container but adds the `source:` field for in-place scripts. The script will be saved in a file and executed for you. The result of the script will be automatically exported into an Argo variable:
+  * **container** - The most common template type. The spec is the same as the one of a container spec in Kubernetes.
+  * **script** - Convenience wrapper around a `container`. The spec is the same as for a container but adds the `source:` field for in-place scripts. The script will be saved in a file and executed for you. The result of the script will be automatically exported into an Argo variable:
 
     ```
     {{tasks.<NAME>.outputs.result}}
     {{steps.<NAME>.outputs.result}}
     ```
 
-  * **Resource** - Performs operations on cluster resources directly. It can be used to get, create, apply, delete replace or patch resouces on your cluster.
-  * **Suspend** - Suspend execution, either for aduration or until it is resumed manually.
+  * **resource** - Performs operations on cluster resources directly. It can be used to get, create, apply, delete replace or patch resouces on your cluster.
+  * **suspend** - Suspend execution, either for aduration or until it is resumed manually.
+  * **plugin** - Is a task that allows you to run an external plugin.
+  * **containerset** - Run multiple containers ina single Pod. Consolidate Pod spin-up time into one step in your workflow.
+  * **data** - Get data from S3.
+  * **http** - Is a task that allows you to make HTTP requests.
 
-* Invocators:
+* Template invocators:
   * **Steps** - A steps template you define your tasks in a series of steps. The structure of the template is a "list of lists". you can use synchronization to run the inner ones one by one. Control execution can be done with e.g. `when:`.
     * Outer lists will run sequentially
     * Inner lists will run in parallel
@@ -168,6 +173,17 @@ Triggers an actions based on a conditional expression or on completion of a step
 Workflows ofthen have outputs that are expensive to compute. Memoization reduces cost and mworkflow execution time by reading the results of previous executions of the same step.
 
 It stores the output of a template into a specfied cache.
+
+## The WorkflowSpec
+
+The `WorkflowSpec` is the main spec of a workflow. It defines the workflow to be executed and stores the state of the workflow.
+
+* `activeDeadlineSeconds` - Duration in seconds relative to the workflow start time.
+* `archiveLogs` - If the container logs should be archived.
+* `arguments` - Contains the parameters and artifacts sent to the workflow entrypoint. Params are referencable globally using the `workdlow` variable
+* `artifactGC` - The strategy to use when deleting artifacts from completed or deleted workflows.
+* `artifacyRepositoryRef` - Specifies the configMap name and key containing the artifact repo config.
+* `entrypoint` - Is a template reference to the starting point of the workflow.
 
 </details>
 
