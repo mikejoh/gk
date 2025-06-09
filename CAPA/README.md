@@ -37,7 +37,7 @@ Components of Argo Workflows include:
 
 The `Workflow`is the most important resourcein Argo and serves two functions:
 
-1. Itdefines the workflow to be executed.
+1. It defines the workflow to be executed.
 2. It stores the state of the workflow.
 
 Should be treated as a "live" object. It's not just a static definition but it's also an "instance" of said definition.
@@ -69,17 +69,15 @@ There are six types of templates, divided into two categories:
   * **resource** - Performs operations on cluster resources directly. It can be used to get, create, apply, delete replace or patch resouces on your cluster.
   * **suspend** - Suspend execution, either for aduration or until it is resumed manually.
   * **plugin** - Is a task that allows you to run an external plugin.
-  * **containerset** - Run multiple containers ina single Pod. Consolidate Pod spin-up time into one step in your workflow.
+  * **containerSet** - Run multiple containers ina single Pod. Consolidate Pod spin-up time into one step in your workflow.
   * **data** - Get data from S3.
   * **http** - Is a task that allows you to make HTTP requests.
-
-* Template invocators:
-  * **Steps** - A steps template you define your tasks in a series of steps. The structure of the template is a "list of lists". you can use synchronization to run the inner ones one by one. Control execution can be done with e.g. `when:`.
+  * **steps** - A steps template you define your tasks in a series of steps. The structure of the template is a "list of lists". you can use synchronization to run the inner ones one by one. Control execution can be done with e.g. `when:`. Can include `container`, `scripts` or `dag`.
     * Outer lists will run sequentially
     * Inner lists will run in parallel
-  * **DAG** - Define tasks as a graph of dependencies. In a DAG, you list all your tasks and set which other tasks must complete before a particular task can begin. Tasks without any dependencies will run in immedately.
+  * **dag** - Define tasks as a graph of dependencies. In a DAG, you list all your tasks and set which other tasks must complete before a particular task can begin. Tasks without any dependencies will run in immediately.
 
-DAG = specify dependencies and allow for maxiumu parallelism.
+DAG = specify dependencies and allow for maximum parallelism.
 
 ## Workflows
 
@@ -184,6 +182,14 @@ The `WorkflowSpec` is the main spec of a workflow. It defines the workflow to be
 * `artifactGC` - The strategy to use when deleting artifacts from completed or deleted workflows.
 * `artifacyRepositoryRef` - Specifies the configMap name and key containing the artifact repo config.
 * `entrypoint` - Is a template reference to the starting point of the workflow.
+* `podGC` - Strategy to use when deleting compelted Pods.
+* `paralellism`- Number of max total parallel Pods that execute at the same time.
+* `serviceAccountName` - The service account to use for the workflow, used for all Pods of the workflow.
+* `templates` - List of workflow templates used in a workflow.
+
+## The DAG
+
+A dag templates
 
 </details>
 
@@ -195,6 +201,8 @@ The `WorkflowSpec` is the main spec of a workflow. It defines the workflow to be
 * Use Argo CD Application
 * Configure Argo CD with Helm and Kustomize
 * Identify Common Reconciliation Patterns
+
+![alt text](image-1.png)
 
 </details>
 
