@@ -204,6 +204,235 @@ A dag templates
 
 ![alt text](image-1.png)
 
+## Core Concepts
+
+* Application - A group of Kubernetes resources as defined by a manifest. CRD.
+* Application source type - Which **tool** is used to build the application.
+* Target state - Desired state
+* Live state - Current state
+* Sync status - Does the live state match the target state?
+* Sync - Process of moving an app to the target state
+* Refresh - Compare latest code in Git with the live state
+* Health - Is it running correctly?
+* Tool - Tool to create manifests from a directory of files e.g. Kustomize.
+
+## Architectural Overview
+
+Components:
+
+* API server - is gRPC/REST service which exposes the API consumed by the web UI
+  * Application management and status reporting
+  * Invoke of application operations (sync, rollback, user defined actions)
+  * Manage repo and cluster credentials
+  * Auth and auth delegation to external identity providers
+  * RBAC enforcement
+  * listener/forwarder for Git webhook events
+
+* Repository server - internal service which maintains a local cache of the Git repository holding the application manifests
+  * Generating and returning Kubernetes manifests when provided with the following inputs:
+    * Repo URL
+    * Revision
+    * App path
+    * Template specifics, params and or helm values.yaml
+
+* Application controller - A continoususly monitors running applications and compares the current, live state against the desired target state (from repo). It detects `OutOfSync` application state and takes action. Lifecycle events are handled by this controller also, presync, sync, postsync.
+
+## Tools
+
+Argo CD supports the following tools:
+
+* Kustomize applications
+* Helm charts
+* Directoy of YAML/JSON manifests including Jsonnet
+* Custom config management tool
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: ConfigManagementPlugin
+metadata:
+  # The name of the plugin must be unique within a given Argo CD instance.
+  name: my-plugin
+spec:
+  # The version of your plugin. Optional. If specified, the Application's spec.source.plugin.name field
+  # must be <plugin name>-<plugin version>.
+  version: v1.0
+  # The init command runs in the Application source directory at the beginning of each manifest generation. The init
+  # command can output anything. A non-zero status code will fail manifest generation.
+  init:
+    # Init always happens immediately before generate, but its output is not treated as manifests.
+    # This is a good place to, for example, download chart dependencies.
+    command: [sh]
+    args: [-c, 'echo "Initializing..."']
+  # The generate command runs in the Application source directory each time manifests are generated. Standard output
+  # must be ONLY valid Kubernetes Objects in either YAML or JSON. A non-zero exit code will fail manifest generation.
+  # To write log messages from the command, write them to stderr, it will always be displayed.
+  # Error output will be sent to the UI, so avoid printing sensitive information (such as secrets).
+  generate:
+    command: [sh, -c]
+    args:
+      - |
+        echo "{\"kind\": \"ConfigMap\", \"apiVersion\": \"v1\", \"metadata\": { \"name\": \"$ARGOCD_APP_NAME\", \"namespace\": \"$ARGOCD_APP_NAMESPACE\", \"annotations\": {\"Foo\": \"$ARGOCD_ENV_FOO\", \"KubeVersion\": \"$KUBE_VERSION\", \"KubeApiVersion\": \"$KUBE_API_VERSIONS\",\"Bar\": \"baz\"}}}"
+  # The discovery config is applied to a repository. If every configured discovery tool matches, then the plugin may be
+  # used to generate manifests for Applications using the repository. If the discovery config is omitted then the plugin 
+  # will not match any application but can still be invoked explicitly by specifying the plugin name in the app spec. 
+  # Only one of fileName, find.glob, or find.command should be specified. If multiple are specified then only the 
+  # first (in that order) is evaluated.
+```
+
+## Projects
+
+Porjects provide logical grouping of applications, which is useful when Argo CD is used by multiple teams. Projects provide the following features:
+
+* Restrict what may be deployed
+* Restrict where apps may be deployed
+* Restrict which objects may or may not be deployed
+* Defining project roles to provide application RBAC
+
+All applications belongs to a single project. The default project is `default` and permits deployments from any source repo, to any cluster and all resource Kinds.
+
+You cant delete the default project, but you can modify it.
+
+You can create a project with the following command:
+
+```bash
+argocd proj create myproject -d https://kubernetes.default.svc,mynamespace -s https://github.com/argoproj/argocd-example-apps.git
+```
+
+You can use negations:
+
+```
+spec:
+  sourceRepos:
+    # Do not use the test repo in argoproj
+    - '!ssh://git@GITHUB.com:argoproj/test'
+    # Nor any Gitlab repo under group/ 
+    - '!https://gitlab.com/group/**'
+    # Any other repo is fine though
+    - '*'
+```
+
+A source repository is considered valid if the following conditions hold:
+
+1. Any allow source rule (i.e. a rule which isn't prefixed with !) permits the source
+2. AND no deny source (i.e. a rule which is prefixed with !) rejects the source
+
+```
+argocd app set guestbook-default --project myproject
+```
+
+Key fields:
+
+* `sourceRepos` - Repos that applicatiosn within the project can **pull manifests from**.
+* `destinations` - Clusters and namespaces that applications within the project can deploy into.
+* `roles` - Entities with definitions of their access to resources wihtin the project.
+
+```yaml
+spec:
+  description: Example Project
+  # Allow manifests to deploy from any Git repos
+  sourceRepos:
+  - '*'
+  # Only permit applications to deploy to the guestbook namespace in the same cluster
+  destinations:
+  - namespace: guestbook
+    server: https://kubernetes.default.svc
+  # Deny all cluster-scoped resources from being created, except for Namespace
+  clusterResourceWhitelist:
+  - group: ''
+    kind: Namespace
+  # Allow all namespaced-scoped resources to be created, except for ResourceQuota, LimitRange, NetworkPolicy
+  namespaceResourceBlacklist:
+  - group: ''
+    kind: ResourceQuota
+  - group: ''
+    kind: LimitRange
+  - group: ''
+    kind: NetworkPolicy
+  # Deny all namespaced-scoped resources from being created, except for Deployment and StatefulSet
+  namespaceResourceWhitelist:
+  - group: 'apps'
+    kind: Deployment
+  - group: 'apps'
+    kind: StatefulSet
+  roles:
+  # A role which provides read-only access to all applications in the project
+  - name: read-only
+    description: Read-only privileges to my-project
+    policies:
+    - p, proj:my-project:read-only, applications, get, my-project/*, allow
+    groups:
+    - my-oidc-group
+  # A role which provides sync privileges to only the guestbook-dev application, e.g. to provide
+  # sync privileges to a CI system
+  - name: ci-role
+    description: Sync privileges for guestbook-dev
+    policies:
+    - p, proj:my-project:ci-role, applications, sync, my-project/guestbook-dev, allow
+    # NOTE: JWT tokens can only be generated by the API server and the token is not persisted
+    # anywhere by Argo CD. It can be prematurely revoked by removing the entry from this list.
+    jwtTokens:
+    - iat: 1535390316
+```
+
+### Project roles
+
+Projects inlclude a feature called roles that can be used to determine who and what can be done to the applications associated with the project.
+
+`proj:<project-name>:<role-name>`
+
+## Sync Options
+
+Allows you to customize some aspects of how it syncs the desired state in the target cluster.
+
+You can configure it in the `Application` resource and it can be set as annotation called `argocd.argoproj.io/sync-options`. Concatenate with a comma!
+
+```yaml
+metadata:
+  annotations:
+    argocd.argoproj.io/sync-options: Prune=false
+```
+
+Options:
+
+* SkipDryRunOnMissingResource=true - skip the dry run for missing resource types.
+* Delete=false - Retain resource after the application is deleted.
+* Prune=false - Prevent object from being pruned.
+* ApplyOutOfSyncOnly=true - Selective sync.
+* PruneLast=true - Resource pruning to happen as a final, implicit wave of a sync operation.
+* Replace=true - By default ArgoCD does a `kubectl apply`. With this option it will do a `kubectl replace` or `kubectl create`. Destructive!
+* ServerSideApply=true - Resources are too big. Replace takes precedence over ServerSideApply.
+* CreateNamespace=true
+
+Namespace Metadata can be added to syncPolicy to add labels and annotations to the namespace being created.
+
+Propagation policies:
+
+* Background
+* Foreground
+* Orphan
+
+## Application Set
+
+Provides:
+
+* Ability to use a single Kubernetes manifest to target multiple Kubernetes clusters
+* The ability to use a single Kubernetes manifest to deploy multipl applications from one or multiple Git repositories with ArgoCD
+* Improved support for monorepos, multiple applications in one Git repository
+
+## Reconcile Optimizations
+
+Argo CD defaults to refreshing every time a resource that belongs to it changes.
+
+Other Kubernetes controllers often update the resources they watch periodically, causing continuous reconcile operation on the Application and high CPU usage.
+
+
+
+## Other notes
+
+In Argo CD i cannot see my application with `helm ls`. When deploying with ArgoCD and helm as the took it's only a template mechanism. After templating it does a `kubectl apply` basically.
+
+The reason for this is that Argo CD shall be neutral to all manifest generators.
+
 </details>
 
 <details>
