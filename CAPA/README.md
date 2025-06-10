@@ -423,15 +423,42 @@ Provides:
 
 Argo CD defaults to refreshing every time a resource that belongs to it changes.
 
-Other Kubernetes controllers often update the resources they watch periodically, causing continuous reconcile operation on the Application and high CPU usage.
+Other Kubernetes controllers often update the resources they watch periodically, causing continuous reconcile operation on the Application and high CPU usage on the `argocd-application-controller`.
 
+By default `resource.ignoreResourcesUpdatesEnabled` is set to `true`. ArgoCD ignores resource updates. This ensures ArgoCD maintaining sustainable performance by reducing the number of reconcile operations.
 
+By default the metadata fiels `generation`, `resourceVersion` and `managedFields` are always ignored for all resources.
+
+## Rate limiting
+
+To prevent high controller resource usage, or sync loops caused either due to misbehaving apps or other environment specific factors, we can configure rate limits on workqueues.
+
+Two types:
+
+* Global - disabled by default. `WORKQUEUE_BUCKET_SIZE` and `WORKQUEUE_BUCKET_QPS` env vars.
+* Per item - limiting the number of times a particular item can be queued.
+
+`max(globalBackoff, perItemBackoff)`
 
 ## Other notes
 
 In Argo CD i cannot see my application with `helm ls`. When deploying with ArgoCD and helm as the took it's only a template mechanism. After templating it does a `kubectl apply` basically.
 
 The reason for this is that Argo CD shall be neutral to all manifest generators.
+
+## Health
+
+Argo CD provides built-in health assessment for several standard Kubernetes types, which is then surfaced to the overall Application health status as a whole. Following checks are made for specific types of Kubernetes resources:
+
+* **Deployment**, **ReplicaSet**, **StatefulSet**, **DaemonSet**
+  * Observed generation is equal to desired generation
+  * Number of **updated** replicas equals the number of desired replicas
+* **Service**
+  * If the service type is of type `LoadBalancer` the `status.loadBalancer.ingress` list is non-empty and validate that there's at least one value for `hostname` or `IP`
+* **Ingress**
+  * Similar to the Service object
+* **PVC**
+  * If the PVC is bound, the `status.phase` is `Bound`
 
 </details>
 
@@ -442,6 +469,133 @@ The reason for this is that Argo CD shall be neutral to all manifest generators.
 * Use Common Progressive Rollout Strategies
 * Describe Analysis Template and AnalysisRun
 
+Argo Rollouts is a tool that enables you to managed and automate the deployment of applications on Kubernetes. It takes the concept of Kubernetes Deployment to the next level by providing advanced deployment strategies.
+
+Implemented as a Kubernetes controller with it's own CRDs.
+
+## Core Concepts
+
+CI, CD, and PD. Progressive Delivery.
+
+Progressive Delivery is an evolution of CD that focuses on the gradual and controlled delivery of new features to users; which ultimately reduces the risk of deploying new features.
+
+Implemented as Argo Rollouts Controller that manages Pods and ReplicaSets.
+
+![alt text](image-2.png)
+
+The rollout resource is the primary resource you will interact with. A drop in replacement of a Deployment.
+
+The ReplicaSet is the same as the one used by the Deployment controller. Rollout controller will manage the ReplicaSet and its Pods.
+
+It can integrate with Ingress, Service and or service meshes to managed traffic routing and direct traffic to new version of an application.
+
+## Analysis and Progressive Delivery
+
+* **Rollout** - drop in replacement for a Deployment resource, provides additional blue/green and canary update strategies. Can create AnalysisRuns and Experiments during the update.
+* **AnalysisTemplate** - An AnalysisTemplate is a template spec which defines **how** to perform a canary analysis, such as the metrics which it should perform, its frequency and the values which are condiered successful or failed. Can be parametrized.
+* **ClusterAnalysisTemplate** -  A ClusterAnalysisTemplate is like an AnalysisTemplate, but it is not limited to its namespace. It can be used by any Rollout throughout the cluster.
+* **AnalysisRun** - An AnalysisRun is an instantiation of an AnalysisTemplate. AnalysisRuns are like Jobs in that they eventually complete. Completed runs are considered Successful, Failed, or Inconclusive.
+* **Experiment** - Limited run of one or more ReplicaSets for the purposes of analysis.
+
+### Remember
+
+The AnalysisTemplate resource **defines the metrics and frequency that will be used to monitor the new version** of an application. It will also include success and failure thresholds that will be used to determine whether the new version is performing as expected.
+
+The AnalysisRun resource **defines the actual analysis** that will be performed. Upon completion, it will return a status of Successful, Failed, or inconclusive and the Rollout controller will use this information to determine whether to continue with the rollout or rollback to the previous version.
+
+### Background Analysis
+
+* Background analysis of progressive delivery
+* Use Prometheus query to perform a measurement
+* Parametrize the analysis
+* Delay starting the analysis
+
+Rollout:
+
+```
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
+metadata:
+  name: guestbook
+spec:
+...
+  strategy:
+    canary:
+      analysis:
+        templates:
+        - templateName: success-rate
+        startingStep: 2 # delay starting analysis run until setWeight: 40%
+        args:
+        - name: service-name
+          value: guestbook-svc.default.svc.cluster.local
+      steps:
+      - setWeight: 20
+      - pause: {duration: 10m}
+      - setWeight: 40
+      - pause: {duration: 10m}
+      - setWeight: 60
+      - pause: {duration: 10m}
+      - setWeight: 80
+      - pause: {duration: 10m}
+```
+
+References the AnalysisTemplate:
+
+```
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate
+spec:
+  args:
+  - name: service-name
+  metrics:
+  - name: success-rate
+    interval: 5m
+    # NOTE: prometheus queries return results in the form of a vector.
+    # So it is common to access the index 0 of the returned array to obtain the value
+    successCondition: result[0] >= 0.95
+    failureLimit: 3
+    provider:
+      prometheus:
+        address: http://prometheus.example.com:9090
+        query: |
+          sum(irate(
+            istio_requests_total{reporter="source",destination_service=~"{{args.service-name}}",response_code!~"5.*"}[5m]
+          )) /
+          sum(irate(
+            istio_requests_total{reporter="source",destination_service=~"{{args.service-name}}"}[5m]
+          ))
+```
+
+### Inline Analysis
+
+Analysis can be perfomed as a rollout step as an inline "analysis" step. If no interval is specified the analysis will perform a single measurement and complete.
+
+### Cluster Analysis Templates
+
+A Rollout can reference a Cluster scoped AnalysisTemplate called a ClusterAnalysisTemplate. This can be useful when you want to share an AnalysisTemplate across multiple Rollouts
+
+### Analysis with multiple templates
+
+A Rollout can reference multiple AnalysisTemplates when constructing an AnalysisRun. This allows users to compose analysis from multiple AnalysisTemplates. If multiple templates are referenced, then the controller will merge the templates together.
+
+## Deployment Strategies
+
+* Rolling Update - slowly replaces the old version with the new version. Default for Deployments.
+* Recreate - deletes the old version of the application before bring up the new version. Two versions never run at the same time.
+* Blue-Green - runs both old and new versions of the application deployed at the same time. Only the old version of the application will receive production traffic. Allows testing the blue one and then switch it so it's the green one.
+* Canary - Exposes a subset of the users to the new version of the application while serving the rest of the traffic to the old version.
+
+Canary with Traffic manager one option.
+
+## Best Practices
+
+* Good for teams deploying in a continous manner. Rollouts for infra components e.g. cert-manager is NOT recommended.
+* Argo Rollouts works with a single Kubernetes deployment and within a single cluster only. The controller need to be deployed in every cluster where a Rollout is running.
+* It does need Argo CD or any other project to work
+* There's no Argo Rollouts API
+
 </details>
 
 <details>
@@ -449,5 +603,10 @@ The reason for this is that Argo CD shall be neutral to all manifest generators.
 
 * Understand Argo Events Fundamentals
 * Understand Argo Event Components and Architecture
+
+* **Event Source** - is the external system that generates events.
+* **Sensor** - listens to event sources and triggers actions to respond to those events.
+* **EventBus** - is backbone for managing delivery of events from event sources to sensors
+* **Trigger** - responds to events by performing actions such as starting workflows, creating Kubernetes resources, or sending notifications.
 
 </details>
