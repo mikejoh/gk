@@ -33,6 +33,23 @@ Components of Argo Workflows include:
 * executor
 * server
 
+## CLI summary
+
+```bash
+argo submit hello-world.yaml --watch # Submit a workflow. Use --watch flag to observe the workflow as it runs.
+argo list # List current workflows.
+argo get hello-world-xxx # Get info about a specific workflow @latest.
+argo logs hello-world-xxx # Print the logs from a workflow.
+argo delete hello-world-xxx # Delete workflow.
+argo submit arguments-parameters.yaml -p message="goodbye world" # Override parameter or --parameter-file params.yaml
+argo suspend WORKFLOW # Suspend a workflow
+argo resume WORKFLOW # Resume a suspended workflow
+argo template create template.yaml # Create a template
+argo cluster-template create clustertemplates.yaml # Create a ClusterWorkflowTemplate
+argo cron create cron.yaml # Create a cron
+argo submit --serviceaccount <name> # Specify which ServiceAccount Argo uses using when submitting Workflows
+```
+
 ## Core Concepts
 
 The `Workflow`is the most important resourcein Argo and serves two functions:
@@ -237,6 +254,15 @@ Components:
 
 * Application controller - A continoususly monitors running applications and compares the current, live state against the desired target state (from repo). It detects `OutOfSync` application state and takes action. Lifecycle events are handled by this controller also, presync, sync, postsync.
 
+## Hooks
+
+Use cases for hooks include:
+
+* Using a PreSync hook to perform a database schema migration.
+* Using a Sync hook to orchestrate a complex deployment.
+* Using a PostSync hook to run integration and health checks after a deployment.
+* Using a SyncFail hook to run clean-up or finalizer logic if a Sync operation fails.
+
 ## Tools
 
 Argo CD supports the following tools:
@@ -411,6 +437,13 @@ Propagation policies:
 * Foreground
 * Orphan
 
+When Argo CD starts a sync, it orders the resources in the following precedence:
+
+* The sync phase
+* The wave they are in (lower values first for creation and updates, higher values first for deletion)
+* By kind (e.g. namespaces first and then other Kubernetes resources, followed by custom resources)
+* By name
+
 ## Application Set
 
 Provides:
@@ -459,6 +492,17 @@ Argo CD provides built-in health assessment for several standard Kubernetes type
   * Similar to the Service object
 * **PVC**
   * If the PVC is bound, the `status.phase` is `Bound`
+
+Health statuses:
+
+The possible values of health status are:
+
+* “Healthy” -> Resource is 100% healthy.
+* “Progressing” -> Resource is not healthy but still has a chance to reach healthy state.
+* “Suspended” -> Resource is suspended or paused. The typical example is a cron job.
+* “Missing” -> Resource is not present in the cluster.
+* “Degraded” -> Resource status indicates failure or resource could not reach healthy state in time.
+* “Unknown” -> Health assessment failed, and actual health status is unknown.
 
 </details>
 
