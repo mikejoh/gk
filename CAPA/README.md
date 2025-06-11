@@ -96,6 +96,21 @@ The internals of a step `Pod` are:
   * **steps** - A steps template you define your tasks in a series of steps. The structure of the template is a "list of lists". you can use synchronization to run the inner ones one by one. Control execution can be done with e.g. `when:`. Can include `container`, `scripts` or `dag`.
     * Outer lists will run sequentially
     * Inner lists will run in parallel
+
+    In this example step1 runs first. Once it is completed, step2a and step2b will run in parallel:
+
+    ```
+    - name: hello-hello-hello
+      steps:
+      - - name: step1
+          template: prepare-data
+      - - name: step2a
+          template: run-data-first-half
+        - name: step2b
+          template: run-data-second-half
+
+    ```
+
   * **dag** - Define tasks as a graph of dependencies. In a DAG, you list all your tasks and set which other tasks must complete before a particular task can begin. Tasks without any dependencies will run in immediately.
 
 DAG = specify dependencies and allow for maximum parallelism.
@@ -125,7 +140,7 @@ Indicates that the template is cluster-scoped.
 
 ## Artifacts
 
-Are packaged as tarbals and gzipped by default. Skip by specifying `archive.none=false`.
+Are packaged as tarballs and gzipped by default. Skip by specifying `archive.none=false`.
 
 Artifact garbae collection for artifacts you dont need can be done with `OnWorkflowCompletion` or `OnWorkflowDeletion`.
 
@@ -148,9 +163,30 @@ You can set a specific `serviceAccountName` for to override the service account 
 
 `artifactRepositoryRef` is used to specify the repository to use for the artifact. This is a reference to a `ConfigMap` or `Secret` that contains the configuration for the artifact repository.
 
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: artifact-repository-ref-
+spec:
+  entrypoint: main
+  artifactRepositoryRef:
+    key: my-key
+  templates:
+    - name: main
+      container:
+        image: busybox
+        command: [ sh, -c ]
+        args: [ "echo hello world | tee /tmp/hello_world.txt" ]
+      outputs:
+        artifacts:
+          - name: hello_world
+            path: /tmp/hello_world.txt
+```
+
 ## Service Accounts
 
-In order for Argo to support features such as artifacts, outputs, access to secrets, etc. It needs to communicate with Kubernetes resources using the KAPI.
+In order for Argo to support features such as artifacts, outputs, access to secrets, etc. It needs to communicate with Kubernetes resources using the Kubernetes API.
 
 ```
 argo submit --serviceaccount <name> <workflow.yaml>
@@ -210,7 +246,78 @@ The `WorkflowSpec` is the main spec of a workflow. It defines the workflow to be
 
 ## The DAG
 
-A dag templates
+As an alternative to specifying sequences of steps, you can define a workflow as a directed-acyclic graph (DAG) by specifying the dependencies of each task. DAGs can be simpler to maintain for complex workflows and allow for maximum parallelism when running tasks.
+
+```yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: dag-diamond-
+spec:
+  entrypoint: diamond
+  templates:
+  - name: echo
+    inputs:
+      parameters:
+      - name: message
+    container:
+      image: alpine:3.7
+      command: [echo, "{{inputs.parameters.message}}"]
+  - name: diamond
+    dag:
+      tasks:
+      - name: A
+        template: echo
+        arguments:
+          parameters: [{name: message, value: A}]
+      - name: B
+        dependencies: [A]
+        template: echo
+        arguments:
+          parameters: [{name: message, value: B}]
+```
+
+### Enhanced Depends
+
+Enhanced `depends` improves on the `dependencies` field by specifying which _result_ of a task to depend on.
+
+Use boolean logic with the operators: `&&`, `||` and `!` to create complex dependencies.
+
+```yaml
+depends: "(task-2.Succeeded || task-2.Skipped) && !task-3.Failed"
+```
+
+Use the `depends` field to specify dependent tasks, their results and boolean logic between them:
+
+```yaml
+<task-name>.<task-result>
+```
+
+### Fail Fast
+
+By default,**DAGs fail fast**: when one task fails, **no new tasks will be scheduled**. Once all running tasks are completed, the DAG will be marked as failed.
+
+If `failFast` is set to `false` for a DAG, all branches will run to completion, regardless of failures in other branches.
+
+## Daemon Containers
+
+Argo Workflows can start containers that run in the background while the workflow itself continues execution. They will be auto destroyed when the workflow exits the template scope.
+
+```
+...
+spec:
+  templates:
+    - name: deamon-example
+      steps: daemon-example
+      - - name: influx
+          template: influx
+    - name: influx
+      daemon: true
+      container:
+        image: influxdb:1.8
+        command: ["/bin/sh", "-c"]
+        args: ["influxd"]
+```
 
 </details>
 
