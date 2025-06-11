@@ -54,8 +54,8 @@ argo submit --serviceaccount <name> # Specify which ServiceAccount Argo uses usi
 
 The `Workflow`is the most important resourcein Argo and serves two functions:
 
-1. It defines the workflow to be executed.
-2. It stores the state of the workflow.
+1. The definition.
+2. The state.
 
 Should be treated as a "live" object. It's not just a static definition but it's also an "instance" of said definition.
 
@@ -66,15 +66,19 @@ In the `WorkflowSpec` the core structures are:
 
 ![alt text](image.png)
 
-The internals of a step Pod are:
+The internals of a step `Pod` are:
 
-* `main` container runs the Image that the user has indicated, where the `argoexec` utility is volume mounted and serves as the main command which calls **the configured Command as a sub-process**.
-* `init` container is an `InitContainer` fetching artifacts and parameters and making them available to the `main` container.
-* `wait` container performs tasks that are needed for clean up, including saving of parameters and artifacts.
+* `main` container
+  * Runs the Image that the user has indicated
+  * The `argoexec` utility is volume mounted
+  * Serves as the main command which calls **the configured Command as a sub-process**
+* `init` container is an `InitContainer`
+  * Fetch artifacts and parameters
+  * Make them available to the `main` container
+* `wait` container
+  * Performs tasks that are needed for clean up, including saving of parameters and artifacts.
 
-There are six types of templates, divided into two categories:
-
-* Work to be done:
+* Types of work that can be done:
   * **container** - The most common template type. The spec is the same as the one of a container spec in Kubernetes.
   * **script** - Convenience wrapper around a `container`. The spec is the same as for a container but adds the `source:` field for in-place scripts. The script will be saved in a file and executed for you. The result of the script will be automatically exported into an Argo variable:
 
