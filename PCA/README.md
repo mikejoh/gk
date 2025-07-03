@@ -103,6 +103,42 @@ Pulling over HTTP offers a number of advantages:
 
 ## Service Discovery
 
+Prometheus uses service discovery to automatically find targets (applications, services, or endpoints) to scrape metrics from, reducing manual configuration and enabling dynamic environments.
+
+### Supported Service Discovery Mechanisms
+
+* **Static Config**: Manually specify a list of targets in the configuration file.
+* **Kubernetes**: Automatically discovers pods, services, and endpoints in a Kubernetes cluster.
+* **Consul**: Integrates with Consul for service registration and discovery.
+* **EC2, GCE, Azure, OpenStack**: Supports cloud provider APIs to discover instances.
+* **DNS**: Uses DNS SRV or A records to find targets.
+* **Marathon, Triton, Docker Swarm, and more**: Integrates with various orchestration platforms.
+
+### Example Configuration
+
+```yaml
+global:
+  scrape_interval: 15s
+
+scrape_configs:
+  - job_name: 'kubernetes-pods'
+    kubernetes_sd_configs:
+      - role: pod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+        action: keep
+        regex: true
+```
+
+### How It Works
+
+* Prometheus periodically queries the configured service discovery mechanism(s).
+
+* Discovered targets are automatically added or removed from scraping as the environment changes.
+* Relabeling rules allow you to filter, modify, or drop discovered targets before scraping.
+
+Service discovery is essential for monitoring dynamic, cloud-native, or containerized environments where endpoints change frequently.
+
 ## Basics of SLOs, SLAs, and SLIs
 
 **SLI**, Service Level Indicator, is a quantitative measure of some aspect of the level of service that is provided. Examples include request latency, error rate, and availability.
@@ -374,6 +410,27 @@ Range vector selector literals work like instant vector literals except that the
 
 The `offset` modifier allows changing the time offset for individual instant and range vectors in a query.
 
+## Recording Rules
+
+Prometheus supports two types of rules which may be configured and then evaluated at regular intervals:
+
+* Recording rules
+* Alerting rules
+
+Load the recording rules using the `rule_files` config option. Reload using SIGHUP.
+
+Recording rules allow you to precompute frequently needed or computationally expensive expressions and save their result as new set of time series. Querying the precomputed result will then often be much faster. Useful for dashboards.
+
+These rules exist in a rule group:
+
+```
+groups:
+  - name: example
+    rules:
+    - record: code:prometheus_http_requests_total:sum
+      expr: sum by (code) (prometheus_http_requests_total)
+```
+
 ## Rates and Derivatives
 
 ![alt text](image-2.png)
@@ -500,9 +557,75 @@ The following functions allow aggregating each series of a given range vector ov
 
 ## Instrumentation
 
+The short answer is: _instrument everything_.
+
+Every library, subsystem, and service should have at least a few metrics to give you a rough idea of how it is performing.
+
+* Instansiate the metric classes in the same file you use them.
+
+Three types of services:
+
+1. **Online serving systems** - monitored on the client and server side
+
+* Key metrics
+  * Performed queries
+  * Errors
+  * Latency
+
+2. **Offline processing** - no one is actively waiting for a response.
+
+3. **Batch jobs** - gauges and pushed via a pushgateway
+
+* Key metrics
+  * overall runtime
+  * last time the job completed
+
+Besides the systems there's also subsystems or sub-parts that should also be monitored:
+
+* Libraries - internal errors and latency within the library itself
+* Logging - increment counter for each line of logging
+* Failures - increase a counter if a failure occurs
+* Threadpools - total number of threads, number of tasks processed, how long they took
+* Caches - total queries, the number of processed and how long they took.
+* Collectors - Export a gauge for how long the collection too in seconds and another for the number of errors encountered!
+
+### Things to watch out for
+
+* Use labels to differentiate between different instances of the same metric. Dont do `http_responses_500_total` but `http_responses_total{code="500"}`.
+* Do not overuse labels - each labelset is an additional time series that has RAM, CPU and network costs.
+* Keep the cardinality low - below 10, the vast majority of your metrics have no labels
+* counter vs gauge, summary vs histogram
+  * to pick between counter and gauge - if the value can go down, use a gauge.
+* timestamps - if you want to track the amount of time since something happened, export the Unix timestamp at which it happened - not time since it happened. `time() - my_timestamp_metric`
+
 ## Exporters
 
+When implementing the collector for your exporter you should never use the usual direct instrumentation approach and then update the metrics on each scrape. Rather create new metrics each time. In Go this is done with `MustNewConstMetric()` in your `Collect()` method. Reasons:
+
+1. Two scrapes could happen at the same time
+2. If label value dissapears, it'll still be exported
+
+Scheduling, metrics should only be pulled from the application when Prometheus scrapes them, exporters should not perform scrapes based on their own timers - be **synchronous**! Cache metrics if it's expensive to retrieve i.e. more than a minute. Default scrape timeout is 10 seconds.
+
+Landing page: simple HTML page with name of the exporter and a link to the metrics page.
+
+Deployment: each exporter should monitor exactly one instance application, sitting right beside it on the same machine.
+
 ## Structuring and naming metrics
+
+A metric name:
+
+* must comply with the data model for valid characters
+* should have a **single** application prefix relevant to the **domain** the metric belogs to
+
+  ```
+  prometheus_notifications_total
+  ```
+
+* must have a single unit, do not mix seconds and milliseconds
+* should use base units e.g. seconds, bytes, meters NOT milliseconds, megabytes etc.
+* should have a suffix describing the unit in plural form. accumulating count as `total` as a suffix: `http_request_duration_seconds`
+* may order its name component in a way that leads to convenient grouping when a list of metric name is sorted lexicographically
 
 </details>
 
@@ -512,9 +635,51 @@ The following functions allow aggregating each series of a given range vector ov
 
 ## Dashboarding basics
 
+Instead of represent every piece of data you have, for operational console think of what are the most likely failer modes and how you would use the consoles to differentiate them.
+
+Use the following guidelines:
+
+* Have no more than 5 graphs on a console
+* Have no more than 5 plots (lines) on each graph
+* When using the provided console template examples, avoid more than 20-30 entries on the right hand side table
+
 ## Configuring Alerting rules
 
+Alerting rules allow you to define alert conditions based on Prometheus expression language and to send notifications about firing alerts to an external service. Whenever the alert expression results in one or more vector elements at a given point in time, the alert counts as active.
+
+```
+groups:
+- name: example
+  labels:
+    team: myteam
+  rules:
+  - alert: HighRequestLatency
+    expr: job:request_latency_seconds:mean5m{job="myjob"} > 0.5
+    for: 10m
+    keep_firing_for: 5m
+    labels:
+      severity: page
+    annotations:
+      summary: High request latency
+```
+
+The optional `for` clause causes Prometheus to wait for a certain duration between first encountering a new expression output vector element and counting an alert as firiing for this element.
+
+There's also a `keep_firing_for` clause that tells Prometheus to keep this alert firing fir a duration after the firing condition was last met, used to prevent flapping alerts.
+
 ## Understand and Use Alertmanager
+
+Alertmanager handles alerts sent by client applications such as the Prometheus server, it takes care of:
+
+* deduplication
+* grouping
+* routing
+
+**Grouping** categorizes aletrs of similar nature into a single notification. This is especially useful during larger outages when many systems fail at once and thousands of alerts my be firing simultaneously.
+
+**Inhibition** is the concept of supressing alert notifications for certain alerts if certain other alerts are already firing.
+
+**Silences** are a straightforward way to simply mute alerts for a given time.
 
 ## Alerting basics (when, what, and why)
 
