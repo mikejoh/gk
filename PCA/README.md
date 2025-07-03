@@ -105,6 +105,43 @@ Pulling over HTTP offers a number of advantages:
 
 ## Basics of SLOs, SLAs, and SLIs
 
+**SLI**, Service Level Indicator, is a quantitative measure of some aspect of the level of service that is provided. Examples include request latency, error rate, and availability.
+
+It answers the question: "What are we measuring?"
+
+Examples:
+
+* Latency
+* Availability
+* Error Rate
+* Throughput
+* Durability
+* Freshness
+
+**SLO**, Service Level Objective, is a target value or range of values for a service level that is measured by an SLI.
+
+It answers the question: "What's our goal for this measurement?"
+
+Examples:
+
+* Latency SLO: "95% of HTTP requests will complete in less than 300ms over a 28-day rolling window."
+* Pod Start Duration SLO (from your example): "95% of pods will start in less than 2.7 seconds over a 5-minute window." (Though for a real SLO, you'd likely use a longer window like 7 or 28 days for stability.)
+
+**SLA**, Service Level Agreement, is a formal agreement between a service provider and a customer that defines the level of service expected from the service provider. It includes specific SLOs and the consequences if those SLOs are not met.
+
+It answers the question: "What happens if we don't meet our agreed-upon goals?"
+
+Examples:
+
+* "Our cloud service guarantees 99.9% uptime for your virtual machines. If availability falls below this threshold in any given month, you will receive a 10% service credit for that month's bill."
+* "We aim to respond to all support tickets within 24 hours. If we fail to meet this response time, you will receive a 5% discount on your next invoice."
+
+Imagine you're delivering pizzas:
+
+* SLI (Indicator): The time it takes to deliver a pizza. (You measure each delivery).
+* SLO (Objective): "95% of pizzas will be delivered within 30 minutes." (Your internal target for quality).
+* SLA (Agreement): "If we don't deliver your pizza within 30 minutes, it's free." (The promise to the customer with a consequence).
+
 </details>
 
 <details>
@@ -269,19 +306,157 @@ Basic info:
 
   <summary>PromQL (28%)</summary>
 
+PromQL provides a functional query language called PromQL that lets the user select and aggregate time series data in real time.
+
+It can be a **instant query**, evaluated at one point in time, or a **range query**, evaluated at equally-spaced steps between a start and end time.
+
+In the UI the Table tab is for instant queries and the Graph tab is for range queries.
+
+An expression or sub-expression can evaluate to one of four types:
+
+* **Instant vector**: a set of time series containing a single sample for each series, sharing the same timestamp.
+* **Range vector**: a set of time series containing a range of data points over time for each time series.
+* **Scalar**: a simple numeric floating point value.
+* **String**: a string value, currently unused.
+
+![alt text](image-1.png)
+
 ## Selecting Data
+
+**Instant vector selectors** allow the seclection of a set of time series and a single sample value for each at a given timestamp (point in time).
+
+`http_requests_total` returns the most recent sample for each. It's possible to filter these time series further by appending a comma-seperated list of matchers in curly braces `{}`.
+
+`http_requests_total{job="prometheus",group="canary"}`
+
+You can use the following operators when doing label matching:
+
+* `=` - exact string match.
+* `!=` - not equal the provided string
+* `=~` - regex-match the provided string
+* `!~` - not regex-matched
+
+Regex matches are fully anchored:
+
+`env=~"foo"` == `env=~"^foo$"`
+
+_Empty label matchers also select all time series that do not have the specific label set at all._
+
+_Multiple matchers can be used for the same label name._
+
+`{__name__=~"job:.*"}` matches all metrics that have a name starting with `job:`.
+
+Range vector selectors literals work like instant vector literals except that they select a range of samples back from the current instant.
+
+`http_requests_total{job="prometheus"}[5m]`, in this example, we select all the values recorded less than 5m ago all time series that have the metric name and job label set.
+
+The `offset` modifier allows changing the time offset for individual instant and range vectors in a query.
 
 ## Rates and Derivatives
 
+![alt text](image-2.png)
+
+The `rate()` function calculates the per-second average rate of increase of a counter over a specified time range:
+
+`rate(http_requests_total[5m])` _per second average increase rate, breaks in monotonicity (counter reset) are automatically adjusted for._
+
+When combining `rate()` with an aggregation operator e.g. `sum()` _ALWAYS_ use rate first then sum. Otherwise `rate()` cannot detect counter resets.
+
+The `irate()` function calculates the per-second instant rate of increase of the time series in a range vector. Based on the two last data points.
+
+Use `irate()` with counters only.
+
+`irate` should only be used for volatile, fast moving counters. Use `rate` for slow moving counters.
+
 ## Aggregating over time
+
+Smooth noisy data or extract time-based statistics from range vectors using the `avg_over_time()`, `min_over_time()`, `max_over_time()`, `sum_over_time()`, and `count_over_time()` functions.
+
+Visualize rolling averages or trends.
 
 ## Aggregating over dimensions
 
+Combine series by removing labels and aggregating across them, example: Sum all HTTP requests, regardsless of job or instances:
+
+```
+sum(http_requests_total)
+```
+
 ## Binary operators
+
+Arithmetic: +, -, *, /, %, ^
+Comparison: ==, !=, >, <, >=, <=
+Logical set ops: and, or, unless
+
+```
+rate(requests_total[1m]) / ignoring(instance) rate(cpu_total[1m])
+```
+
+You can use `on()` to match only specific labels, use `ignoring()` to exclude specific labels.
 
 ## Histograms
 
+Analyzing distributions, such as request durations or response sizes.
+
+Histograms and summaries are more complex metric types. Not only does a single histogram or summary create a multitude of timeseries it is also more difficult to use these metric types correctly.
+
+Both of these sample observations, typically request durations or response sizes.
+
+A straight-forward use of histograms is to count observaitions failling into particular buckets of observation values.
+
+Two rules of thumb:
+
+1. If you need to aggregate, choose histograms.
+2. Otherwise, choose a histogram if you have an idea of the range and distribution of values that will be observed. Choose a summary if you need an accurate quantile, no matter what the range and distribution of the values is.
+
+### Apdex
+
+You might have an SLO (Service Level Objective) to serve 95% of requests within 300ms. Configure a histogram to have a bucket with an upper limit of 0.3 seconds. Now you can directly express the relative amount of requests served within 300ms and easily alert if the value drops below 95%:
+
+```
+sum(rate(http_request_duration_seconds_bucket{le="0.3"}[5m])) by (job)
+/
+sum(rate(http_request_duration_seconds_count[5m])) by (job)
+```
+
+### Quantiles
+
+You can use both summaries and histograms to calculate quantiles. Where 0 <= q <= 1. The 0.5 quantile is the median, the 0.9 quantile is the 90th percentile, and so on.
+
+Lets say we dont want to display the percentage of requests served within 300ms, but rather the 95th percentile of request durations. We can use the `histogram_quantile()` function to calculate this from a histogram:
+
+```
+histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
+```
+
+Quantile/Percentile Cheat Sheet (Simple & Short)
+
+The Xth Percentile (Px) means:
+
+* X% of things are AT OR BELOW this value.
+* (100 - X)% of things are ABOVE this value.
+
+Common Percentiles & What They Indicate:
+
+* P50 (Median): The "typical" experience. Half are faster, half are slower.
+* P90: What 90% of users/events experience. Good for general performance.
+* P95: A common benchmark. 95% are at or below this. Filters out the worst few.
+* P99 (Tail Latency): The "worst-case" for almost everyone (slowest 1%). Crucial for finding rare but painful issues.
+
+Key Takeaways:
+
+* Average (Mean) is misleading: A few slow events can drastically inflate it.
+* Percentiles show the spread: How consistent is performance, especially for the slower events.
+* Small gap P90-P99: Good! Performance is consistent, few extreme outliers.
+* Large gap P90-P99: Bad! Your "worst case" is significantly worse than typical. Investigate the tail!
+
 ## Timestamp Metrics
+
+`timestamp()` returns the timestamp of the last sample in a time series.
+
+`timestamp(node_cpu_seconds_total)` would return the timestamp of the latest sample of the `node_cpu_seconds_total` time series.
+
+`time()` returns the current time in seconds since the epoch. Example: `time() - timestamp(node_cpu_seconds_total)` would return the time since the last sample of the `node_cpu_seconds_total` time series.
 
 </details>
 
