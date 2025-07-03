@@ -235,6 +235,28 @@ scrape_configs:
 
 ## Understanding Prometheus Limitations
 
+Prometheus is a powerful monitoring and alerting toolkit, but it has several important limitations to be aware of:
+
+* **Not a Long-Term Storage Solution**: Prometheus is designed for short- to medium-term storage. For long-term retention, you need to integrate with remote storage solutions (e.g., Thanos, Cortex, Mimir).
+
+* **Single Node Autonomy**: Each Prometheus server is standalone and does not natively cluster for high availability or horizontal scalability. You must run multiple instances and handle federation or use third-party solutions for HA.
+
+* **Scaling Challenges**: Prometheus can struggle with very large environments (tens of millions of time series) due to memory and storage constraints. Sharding and federation can help, but add complexity.
+
+* **No Built-in User Authentication/Authorization**: Prometheus does not provide built-in authentication or role-based access control (RBAC). You must use a reverse proxy or external solution to secure endpoints.
+
+* **Limited Query Language for Some Use Cases**: PromQL is powerful for time series analysis, but can be limiting for complex joins, subqueries, or non-time-series data.
+
+* **Pull Model Limitations**: The pull model works well for most use cases, but can be problematic for ephemeral or short-lived jobs. The Pushgateway is a workaround, but has its own limitations (e.g., no automatic expiry of metrics).
+
+* **No Native Event or Log Collection**: Prometheus is focused on metrics, not logs or events. You need to use other tools (e.g., Loki, ELK) for logs and events.
+
+* **Alerting Limitations**: Alertmanager is powerful, but lacks some advanced features found in dedicated alerting systems (e.g., multi-tenancy, advanced silencing, or alert deduplication across clusters).
+
+* **No Built-in Data Encryption**: Prometheus does not encrypt data at rest or in transit by default. You must configure TLS and storage encryption yourself.
+
+* **Label Cardinality**: High cardinality (many unique label combinations) can cause performance and storage issues. Careful metric and label design is required.
+
 ## Data Model and Labels
 
 ### Metric names
@@ -452,11 +474,21 @@ Key Takeaways:
 
 ## Timestamp Metrics
 
-`timestamp()` returns the timestamp of the last sample in a time series.
-
 `timestamp(node_cpu_seconds_total)` would return the timestamp of the latest sample of the `node_cpu_seconds_total` time series.
 
 `time()` returns the current time in seconds since the epoch. Example: `time() - timestamp(node_cpu_seconds_total)` would return the time since the last sample of the `node_cpu_seconds_total` time series.
+
+`timestamp(v instant-vector)` returns the timestamp of each of the samples of the given vector as the number of seconds since January 1, 1970 UTC. It acts on float and histogram samples in the same way.
+
+`<aggregation>_over_time()`
+
+The following functions allow aggregating each series of a given range vector over time and return an instant vector with per-series aggregation results:
+
+* `avg_over_time(range-vector)` - Average value of all float or histogram samples in the specified interval.
+* `min_over_time(range-vector)` - Minimum value of all float or histogram samples in the specified interval.
+* `max_over_time(range-vector)` - Maximum value of all float or histogram samples in the specified interval.
+* `sum_over_time(range-vector)` - Sum of all float or histogram samples in the specified interval.
+* `count_over_time(range-vector)` - Count of all samples in the specified interval.
 
 </details>
 

@@ -88,7 +88,7 @@ The internals of a step `Pod` are:
     ```
 
   * **resource** - Performs operations on cluster resources directly. It can be used to get, create, apply, delete replace or patch resouces on your cluster.
-  * **suspend** - Suspend execution, either for aduration or until it is resumed manually.
+  * **suspend** - Suspend execution, either for a duration or until it is resumed manually.
   * **plugin** - Is a task that allows you to run an external plugin.
   * **containerSet** - Run multiple containers ina single Pod. Consolidate Pod spin-up time into one step in your workflow.
   * **data** - Get data from S3.
@@ -142,7 +142,7 @@ Indicates that the template is cluster-scoped.
 
 Are packaged as tarballs and gzipped by default. Skip by specifying `archive.none=false`.
 
-Artifact garbae collection for artifacts you dont need can be done with `OnWorkflowCompletion` or `OnWorkflowDeletion`.
+Artifact garbage collection for artifacts you dont need can be done with `OnWorkflowCompletion` or `OnWorkflowDeletion`.
 
 Strategies:
 `artifactGC.strategy=Never`, set the strategy in the spec to make it global.
@@ -157,7 +157,7 @@ Strategies:
 
 Hardwired Artifacts are static explicitly defined artifacts.
 
-Condsider parameterizing your S3 keys by `workflow.uid` in case you have concurrent workflows of the same spec.
+Consider parameterizing your S3 keys by `workflow.uid` in case you have concurrent workflows of the same spec.
 
 You can set a specific `serviceAccountName` for to override the service account used to access S3.
 
@@ -227,7 +227,7 @@ Triggers an actions based on a conditional expression or on completion of a step
 
 Workflows ofthen have outputs that are expensive to compute. Memoization reduces cost and mworkflow execution time by reading the results of previous executions of the same step.
 
-It stores the output of a template into a specfied cache.
+It stores the output of a template into a specified cache.
 
 ## The WorkflowSpec
 
@@ -237,10 +237,10 @@ The `WorkflowSpec` is the main spec of a workflow. It defines the workflow to be
 * `archiveLogs` - If the container logs should be archived.
 * `arguments` - Contains the parameters and artifacts sent to the workflow entrypoint. Params are referencable globally using the `workdlow` variable
 * `artifactGC` - The strategy to use when deleting artifacts from completed or deleted workflows.
-* `artifacyRepositoryRef` - Specifies the configMap name and key containing the artifact repo config.
+* `artifactRepositoryRef` - Specifies the configMap name and key containing the artifact repo config.
 * `entrypoint` - Is a template reference to the starting point of the workflow.
 * `podGC` - Strategy to use when deleting compelted Pods.
-* `paralellism`- Number of max total parallel Pods that execute at the same time.
+* `parallelism`- Number of max total parallel Pods that execute at the same time.
 * `serviceAccountName` - The service account to use for the workflow, used for all Pods of the workflow.
 * `templates` - List of workflow templates used in a workflow.
 
@@ -608,12 +608,12 @@ Health statuses:
 
 The possible values of health status are:
 
-* “Healthy” -> Resource is 100% healthy.
-* “Progressing” -> Resource is not healthy but still has a chance to reach healthy state.
-* “Suspended” -> Resource is suspended or paused. The typical example is a cron job.
-* “Missing” -> Resource is not present in the cluster.
-* “Degraded” -> Resource status indicates failure or resource could not reach healthy state in time.
-* “Unknown” -> Health assessment failed, and actual health status is unknown.
+* "Healthy" -> Resource is 100% healthy.
+* "Progressing" -> Resource is not healthy but still has a chance to reach healthy state.
+* "Suspended" -> Resource is suspended or paused. The typical example is a cron job.
+* "Missing" -> Resource is not present in the cluster.
+* "Degraded" -> Resource status indicates failure or resource could not reach healthy state in time.
+* "Unknown" -> Health assessment failed, and actual health status is unknown.
 
 </details>
 

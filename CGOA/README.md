@@ -12,7 +12,7 @@ _This exam is an online, proctored, multiple-choice exam._
 <details>
   <summary>GitOps Terminology</summary>
 
-* Continuous - Continues to happen, not necessarily in instantaneous.Ensures that your system remains in the desired state consistently.
+* Continuous - Continues to happen, not necessarily in instantaneous. Ensures that your system remains in the desired state consistently.
 * Declarative Description - A config that describes the desired operating state of a system without specifying procedures how that state will be achieved. Focus on the desired outcome rather than implementation details.
 * Desired State - The Final configuration or state that you want your system to achieve.
 * State Drift - Inconsistency or variance between the desired state and the actual state of the system. Identifying and addressing state drift helps maintain system **reliability** and **consistency**.
@@ -42,7 +42,7 @@ GitOps is a software **delivery philosophy** that treats source code managment s
   <summary>Related Practices</summary>
 
 * Configuration as Code (CaC)
-  * Involves managing and provisioning infrastructure through mahine-readable configuration files.
+  * Involves managing and provisioning infrastructure through machine-readable configuration files.
 * Infrastructure as Code (IaC)
   * Key practice within DevOps that involves managing and provisioning computing infrastructure through code instead of manual processes.
   * Foundational to GitOps.
@@ -51,7 +51,7 @@ GitOps is a software **delivery philosophy** that treats source code managment s
   * DevSecOps extends DevOps by integrating security practices into the DevOps process.
 * CI/CD
   * CI - Continuous Integration, the automated process of integrating code changes from multiple contributors into a shared repository.
-  * CD - Continuous Delivery, the practice of automating the software delivery progrss to unsure that code changes can be deployed to production at any time.
+  * CD - Continuous Delivery, the practice of automating the software delivery progrss to ensure that code changes can be deployed to production at any time.
 
 </details>
 

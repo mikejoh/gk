@@ -12,7 +12,7 @@ _This exam is an online, proctored, multiple-choice exam._
 <details>
   <summary>Architecture (20%)</summary>
 
-Cilium is an open source CNI compatible networking and scurity layer for Kubernetes. Thanks to BGP, a powerful kernel extensibility mechanism inside of Linux, Cilium rethinks the Linux networking.
+Cilium is an open source CNI compatible networking and security layer for Kubernetes. Thanks to BGP, a powerful kernel extensibility mechanism inside of Linux, Cilium rethinks the Linux networking.
 
 In-kernel networking brings:
 
@@ -24,7 +24,7 @@ BPF: Framework for running custom logic at various hook points in the kernel.
 
 BPF programs: The logic, JIT compiled.
 
-Service centric identity and API awareness, with Cilium identity is extracted from the contianer orchestrator and embedded in each network request.
+Service centric identity and API awareness, with Cilium identity is extracted from the container orchestrator and embedded in each network request.
 
 Cilium removes the need of a sidecar proxy, per Pod proxy between microservices, the Istio or Envoy way of doing this suboptimally by traversing the TCP/IP stack. BPF brings "sockmap".
 
@@ -36,7 +36,7 @@ Cilium removes the need of a sidecar proxy, per Pod proxy between microservices,
 
 * Agent, runs on each node. Accepts config via Kubernetes. Listens on events from orchestration systems _such as_ Kubernetes. Manages eBPG programs which the Linux kernel uses to control all network access.
 * Debug Client, `cilium-dbg`. Interacts with the REST API of the Cilium agent running on the same node. Inspects state and status of the local agent.
-* Operator, responsible for managing duries in the cluster which should logically be handled once for the entire cluster, rather than once for each node. _Not in the critical path for functionality on the network layer._. If there's a failure in the Operator this might happen:
+* Operator, responsible for managing duties in the cluster which should logically be handled once for the entire cluster, rather than once for each node. _Not in the critical path for functionality on the network layer._. If there's a failure in the Operator this might happen:
   * Delays in IPAM and thus scheduling of new workloads.
   * Failure to update **kvstore** heartbeat key.
 * CNI Plugin, invoked when a pod is scheduled or terminated on a node. Interacts with the Cilium API of the node.
@@ -57,11 +57,11 @@ eBPF is a Linux kernel bytecode interpreter. In-kernel verifier ensures that eBP
 State propagation between agents are done via:
 
 * CRD, the default
-* Key-Value store, an optimization. etcd as the only supported one. Imagine having a seperate etcd for this and not use the same as the cluster.
+* Key-Value store, an optimization. etcd as the only supported one. Imagine having a separate etcd for this and not use the same as the cluster.
 
 ### eBPF Data Path
 
-The Linux kernel supports a set of BPF hooks in the networking stack that can be used to run BPF programs. The Cilium **datapath** uses these hooks to load BPF programs to create _higher level networking contructs_.
+The Linux kernel supports a set of BPF hooks in the networking stack that can be used to run BPF programs. The Cilium **datapath** uses these hooks to load BPF programs to create _higher level networking constructs_.
 
 * XDP is at the earliest point possible in the networking driver. Ideal for running filtering programs that drop malicious or unexpected traffic, DDOS protection mechanism!
 * Traffic Control, TC, ingress/egress. Runs **after** the networking stack has done initial processing of the packet. Runs before L3. Containers typically use a virtual device called a veth pair which acts like a virtual wire connecting the container to the host. TC ingress hook is added on the host side.
@@ -91,11 +91,11 @@ All BPF maps are created with a upper capacity limits.
 
 #### IPtables usage
 
-Depending on the Linux kernel version used, the eBPF datapath can implrement a varying feature set fully in eBPF. If required capabilities are not available the functionality provided using a leagacy iptables implementation.
+Depending on the Linux kernel version used, the eBPF datapath can implement a varying feature set fully in eBPF. If required capabilities are not available the functionality provided using a legacy iptables implementation.
 
 ### IPAM
 
-Responsible for the allocation and management of IP addresses used by network endpoints (containers and others). Dont change the IPAM mode of an existing cluster, this may cause persistent disruption of connectivity for existing workloads.
+Responsible for the allocation and management of IP addresses used by network endpoints (containers and others). Don't change the IPAM mode of an existing cluster, this may cause persistent disruption of connectivity for existing workloads.
 
 There's different modes:
 
@@ -112,7 +112,7 @@ There's different modes:
 
 Whenever something needs to be described, addressed or selected, it is done based on labels:
 
-* Endpoint are assinged labels
+* Endpoint are assigned labels
 
 A label is a pair of strings consisting of a `key` and `value`.
 
@@ -159,7 +159,7 @@ Supported label sources:
 
 The endpoint ID is an internal id that Cilium assigns to all endpoints on a cluster node. The endpoint ID is unique within the context of an individual cluster node.
 
-All endpoints are assigned an identity, the identity is what is used **to enforce basic connectivity between endpoints**. Equvialent to L3 enforcement. An identity is **identified by Labels and is given a cluster wide unique identifier**.
+All endpoints are assigned an identity, the identity is what is used **to enforce basic connectivity between endpoints**. Equivalent to L3 enforcement. An identity is **identified by Labels and is given a cluster wide unique identifier**.
 
 Examples on special identities:
 
@@ -317,7 +317,7 @@ Install the `hubble` CLI to get som more insights in the traffic.
 
 * For Cilium, Ingress and Gateway API are part of the networking stack, and so behaves in a different way to other Ingress or Gateway API controllers.
 * Other Ingress or Gateway API controllers are generally installed as a Deployment or DaemonSet
-* Ciliums Ingress and Gateway API config is exposed witha a Loadbalancer or NodePort service, or the host network. When traffic **arrives at the Service's port, eBPF forwards this to Enviy (using TPROXY kernel facility)**. This changes the *_visbility_ of headers etc. from how other controllers does this.
+* Ciliums Ingress and Gateway API config is exposed witha a Loadbalancer or NodePort service, or the host network. When traffic **arrives at the Service's port, eBPF forwards this to Enviy (using TPROXY kernel facility)**. This changes the *_visibility_ of headers etc. from how other controllers does this.
 
 Ingress and Gateway API traffic bound to backend services via Cilium passes through a per-node Envoy proxy, the per-node proxy has special code to allow it to interact with eBPF policy engine making Envoy a network policy enforcer point.
 
@@ -433,130 +433,4 @@ Install the `cilium` CLI:
 
 `cilium status --wait`
 
-`cilium connectivity test` - run network connectivity test
-
-</details>
-
-<details>
-  <summary>Cluster Mesh (10%)</summary>
-
-* Understand the Benefits of Cluster Mesh for Multi-cluster Connectivity
-* Achieve Service Discovery and Load Balancing Across Clusters with Cluster Mesh
-
-Multi-cluster or Cluster Mesh extends the networking datapath across multiple clusters. It allows endpoints in all connected clusters to communicate while providing full policy enforcement.
-
-Pre-req:
-
-* All clusters must be running the same datapath mode, `encapsulation` or `native-routing`.
-* PodCIDR ranges in all cluster must be non-conflicting.
-* IP connectivity between eachother using InternalIP for each node is needed.
-* The network between clusters must allow the inter-cluster communication via FWs.
-
-Max 255 clusters!
-
-Changing the cluster ID can be done in a running cluster with live workload, but all workloads needs to e restarted since the security identity is created using the id.
-
-to get Hubble Relay to work you'll need to move the CA certificate around.
-
-```
-cilium clustermesh enable --context $CLUSTER1
-cilium clustermesh enable --context $CLUSTER2
-```
-
-```
-cilium clustermesh connect --context $CLUSTER1 --destination-context $CLUSTER2
-```
-
-Test connectivity:
-
-```
-cilium connectivity test --context $CLUSTER1 --multi-cluster $CLUSTER2
-```
-
-### KVStoreMesh
-
-KVStoreMesh is an extenstion of Cluster Mesh, it caches the information obtained from the remote cluster in a local kvstore, such as etcd.
-
-This is different from vanilla Cluster Mesh where each agent directly pulls the information from the remote clusters.
-
-Since 1.16 this is enabled by default.
-
-### Load balancing
-
-Use the annotation `service.cilium.io/global: "true"` to declare a identical service in identical namespaces across multiple clusters as global.
-
-Loadbalancing will automatically be performed across clusters.
-
-### Exporting a Service
-
-To export a service you should create a `ServiceExport` resource. As a result your Service will be exported to all clusters, provided that the Service Namespace is present on those clusters.
-
-</details>
-
-<details>
-  <summary>eBPF (10%)</summary>
-
-* Understand the Role of eBPF in Cilium
-* eBPF Key Benefits
-* eBPF-based Platforms versus IPtables-based Platforms
-
-The Extended Berkely Packet Filter, filtering network packets, the extended part of the name also means that it can be used to so much more than just packet filtering.
-
-It's primarily a _framework_ that allows users to load and run custom programs within the kernel. Which means it can _extend_ or even _modify_ the way the kernel behaves.
-
-eBPF enables us to collect customized information about an app without having to change the app itself.
-
-Watching or observing an application from the kernel perspective is not new, we've had `perf` for a while.
-
-eBPF programming is powerful but complex.
-
-## The Kernel and eBPF
-
-The kernel is a software layer between your applications and the hardware they're running on. Applications run in an unprivileged layer called user space. Apps cannot access hardware directly. This is done through syscalls.
-
-It's hard to get changes into the kernel.
-
-You can always write your own module, these can be loaded and unloaded on demand. The challenge here is that this is still full-on kernel programming.
-
-eBPF allows us to run arbitrary code in the kernel, the _verifier_ analyzes an eBPF program to ensure that regardless of input it will always terminate safely.
-
-eBPF programs can be loaded into the kernel dynamically. The kernel accepts eBPF programs in _bytecode_ form. The program itself is typically written in C or Rust and compiled into an object file.
-
-![alt text](image-7.png)
-
-## Network Interfaces
-
-XDP allows attaching an eBPF program to a network interface, so that it is triggered whenever a packet is received on that interface. It can inspect the packet and the exit code can tell the kernel what to do with that packet.
-
-eBPF Maps, maps are datastructures that are defined alongside eBPF programs. key-value stores. Common uses for maps include:
-* eBPF program writing metrics
-* User space code writing configuration information
-* An eBPF program writing data into a map for later retreival by another eBPF program
-
-![alt text](image-8.png)
-
-## Tuning
-
-### eBPF host routing
-
-Even when network routing is performed by Cilium using eBPF, by default network packets still traverse some parts of the regular network stack of the node. To ensure packets traverses all of the iptables hooks in case you depend on them.
-
-With `cilium status` you should see Host Routing set to `BPF`.
-
-### IPv4 BIG TCP
-
-Allows the network stack to prepare larger GSO (tx) and GRO (rx) packets to reduce the number of time the stack is traversed which improves performance!
-
-### Bandwidth Manager
-
-Responsible for managing network traffic more efficiently.
-
-</details>
-
-<details>
-  <summary>BGP and External Networking (6%)</summary>
-
-* Egress Connectivity Requirements
-* Understand Options to Connect Cilium-managed Clusters with External Networks
-
-</details>
+`cilium connectivity test`
