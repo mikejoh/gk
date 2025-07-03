@@ -13,7 +13,7 @@ _This exam is an online, proctored, multiple-choice exam._
 <details>
   <summary>Observability Concepts (18%)</summary>
 
-Prometheus is an open-source systems monitoring and aletring toolkit.
+Prometheus is an open-source systems monitoring and alerting toolkit.
 
 Features:
 
@@ -30,9 +30,9 @@ Metrics are _numerical measurements_ in layperson terms. The term _time series_ 
 
 Metric types:
 
-* **Counter**: A cumulative metric that represents a single monotonically increasing counter. It can only increase or be reset to zero. Do **not** use counter for values that can decrease, example do not use a counter to track the number of currenlty running processes.
-* **Gauge**: A metric that represents a single numerical value that can arbitrarily fo up and down. Ususally used for values like temperatures, current memory, concurrent requests.
-* **Historgram**: Samples observeations, usually things like request duration or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
+* **Counter**: A cumulative metric that represents a single monotonically increasing counter. It can only increase or be reset to zero. Do **not** use a counter for values that can decrease. For example, do not use a counter to track the number of currently running processes.
+* **Gauge**: A metric that represents a single numerical value that can arbitrarily go up and down. Usually used for values like temperatures, current memory, concurrent requests.
+* **Histogram**: Samples observations (usually things like request duration or response sizes) and counts them in configurable buckets. It also provides a sum of all observed values.
   
   A histogram with a base metric of `<basename>` exposes multiple time series during a scrape:
   * Cumulative counters for the observations buckets, exposed as `<basename>_bucket{le=<upper_inclusive_bound>}`
@@ -41,9 +41,9 @@ Metric types:
 
   Use the `histogram_quantile()` function to calculate quantiles from histograms or even aggregations of histograms.
 
-  Suitable for calculate an Apdex score. Application Performance Index.
+  Suitable for calculating an Apdex score. Application Performance Index.
 
-* **Summmary**: Similar to a histogram, samples observations, like request durations and response sizes. W
+* **Summary**: Similar to a histogram, samples observations like request durations and response sizes.
 
 ## Understand logs and events
 
@@ -51,7 +51,7 @@ Using the Prometheus query log, it has the ability to log all the queries run by
 
 To enable it:
 
-1. Adapt the configuration add or remove query log configurations in the `prometheus.yml` file:
+1. Adapt the configuration to add or remove query log configurations in the `prometheus.yml` file:
 
    ```yaml
    global:
@@ -59,25 +59,25 @@ To enable it:
      # Additional configurations can be added here
    ```
 
-2. Reload the Proemtheus server configuration by `POST`ing to the `/-/reload` endpoint. Needs the `--web.enable-lifecycle` flag to be set when starting the Prometheus server. Use `SIGHUP` to the Prometheus process.
+2. Reload the Prometheus server configuration by `POST`ing to the `/-/reload` endpoint. Needs the `--web.enable-lifecycle` flag to be set when starting the Prometheus server. Use `SIGHUP` to the Prometheus process.
 
 The format:
 
 * `params`: The query. The start and end timestamp, the step and the actual query statement.
-* `stats`: Statictics. Currently, it contains internal engine timers.
+* `stats`: Statistics. Currently, it contains internal engine timers.
 * `ts`: The timestamp.
 
-Add logrotation since Prometheus will not do this.
+Add log rotation since Prometheus will not do this.
 
 ### Events
 
-Prometheus is not an event-based system. Some monitoring systems are event-based, they report each individual event (HTTP request, an exception) to a central monitoring system immediately **as it happens**. This system aggregates the events into metrics (StatsD is the prime example of this). Or stores it for later processing, like ELK stack.
+Prometheus is not an event-based system. Some monitoring systems are event-based; they report each individual event (HTTP request, an exception) to a central monitoring system immediately **as it happens**. This system aggregates the events into metrics (StatsD is the prime example of this), or stores it for later processing, like the ELK stack.
 
 In such a system, pulling would be problematic indeed: the instrumented service would have to buffer events between pulls, and the pull would have to happen incredibly frequently.
 
-Prometheus is only interested in reguralily collecting the **current state** of a given set of metrics, not the underlying events that led to the generation of those metrics.
+Prometheus is only interested in regularly collecting the **current state** of a given set of metrics, not the underlying events that led to the generation of those metrics.
 
-The resulting monitoring traffic is low, and pull-based approach does not create problems in this case.
+The resulting monitoring traffic is low, and the pull-based approach does not create problems in this case.
 
 ## Tracing and Spans
 
@@ -87,7 +87,7 @@ Prometheus supports OpenTelemetry protocol ingestion through HTTP.
 
 ### Traces
 
-A trace represents the whole journey of a request or an action as it moved through all the nodes of a distributed system.
+A trace represents the whole journey of a request or an action as it moves through all the nodes of a distributed system.
 
 ### Spans
 
@@ -154,11 +154,11 @@ Imagine you're delivering pizzas:
 
 Prometheus **scrapes** metrics from **instrumented jobs**, either directly or via an intermediary push gateway for **short-lived jobs**.
 
-Prometheus works well for recording any purely numeric time series, it fits both machine-cetric monitoring as well as monitoring of highly dynamic service oriented archtectures.
+Prometheus works well for recording any purely numeric time series. It fits both machine-centric monitoring as well as monitoring of highly dynamic service-oriented architectures.
 
 Designed for readability.
 
-If you need 100% accuracy, such as per request biliing, Prometheus is not a good choice as the collected data will likely not be detailed and complete enough. In that case it's better to use some other system to collect and analyze the data for billig, and Prometheus for the rest of your monitoring.
+If you need 100% accuracy, such as per-request billing, Prometheus is not a good choice as the collected data will likely not be detailed and complete enough. In that case, it's better to use some other system to collect and analyze the data for billing, and use Prometheus for the rest of your monitoring.
 
 Components:
 
@@ -239,7 +239,7 @@ scrape_configs:
 
 ### Metric names
 
-* Metric names SHOULD specify the **general fature** of a system that is being measured e.g. `http_requests_total` - the total number of HTTP requests received.
+* Metric names SHOULD specify the **general feature** of a system that is being measured, e.g., `http_requests_total` - the total number of HTTP requests received.
 * Metric names MAY use any UTF-8 characters.
 * Metric names SHOULD match the regex: `[a-zA-Z_:][a-zA-Z0-9_:]*` which means they can contain letters, digits, underscores, and colons.
 
@@ -253,7 +253,7 @@ Any **change** of *_any_  label value, including adding or removing labels, will
 
 Naming convention:
 
-* Labels names MAY use any UTF-8 characters.
+* Label names MAY use any UTF-8 characters.
 * Label names beginning with `__` (underscores) MUST be reserved for internal Prometheus use.
 * Label names SHOULD match the regex `[a-zA-Z_][a-zA-Z0-9_]*` for the best experience and compatibility with other tools. Same as metric names.
 * Label values MAY contain any UTF-8 characters.
@@ -283,7 +283,7 @@ Basic info:
 
 * Transmission is done over HTTP.
 * Encoding is UTF-8.
-* HTTP `Content-Type` is `text/plain; version=0.0.4`. A missing version will lead to **fall-back to the most recent text format version.
+* HTTP `Content-Type` is `text/plain; version=0.0.4`. A missing version will lead to **fall-back to the most recent text format version.**
 * HTTP `Content-Encoding` (optional): `gzip`
 * Advantages:
   * Human-readable
@@ -291,7 +291,7 @@ Basic info:
   * Readable line by line
 * Limitations:
   * Verbose
-  * Docstrings not integral part of the syntax no or little metric contract validation
+  * Docstrings not integral part of the syntax; no or little metric contract validation
   * Parsing cost
 * Supported metric primitives
   * Counter
@@ -308,7 +308,7 @@ Basic info:
 
 PromQL provides a functional query language called PromQL that lets the user select and aggregate time series data in real time.
 
-It can be a **instant query**, evaluated at one point in time, or a **range query**, evaluated at equally-spaced steps between a start and end time.
+It can be an **instant query**, evaluated at one point in time, or a **range query**, evaluated at equally-spaced steps between a start and end time.
 
 In the UI the Table tab is for instant queries and the Graph tab is for range queries.
 
@@ -323,16 +323,16 @@ An expression or sub-expression can evaluate to one of four types:
 
 ## Selecting Data
 
-**Instant vector selectors** allow the seclection of a set of time series and a single sample value for each at a given timestamp (point in time).
+**Instant vector selectors** allow the selection of a set of time series and a single sample value for each at a given timestamp (point in time).
 
-`http_requests_total` returns the most recent sample for each. It's possible to filter these time series further by appending a comma-seperated list of matchers in curly braces `{}`.
+`http_requests_total` returns the most recent sample for each. It's possible to filter these time series further by appending a comma-separated list of matchers in curly braces `{}`.
 
 `http_requests_total{job="prometheus",group="canary"}`
 
 You can use the following operators when doing label matching:
 
 * `=` - exact string match.
-* `!=` - not equal the provided string
+* `!=` - not equal to the provided string
 * `=~` - regex-match the provided string
 * `!~` - not regex-matched
 
@@ -346,9 +346,9 @@ _Multiple matchers can be used for the same label name._
 
 `{__name__=~"job:.*"}` matches all metrics that have a name starting with `job:`.
 
-Range vector selectors literals work like instant vector literals except that they select a range of samples back from the current instant.
+Range vector selector literals work like instant vector literals except that they select a range of samples back from the current instant.
 
-`http_requests_total{job="prometheus"}[5m]`, in this example, we select all the values recorded less than 5m ago all time series that have the metric name and job label set.
+`http_requests_total{job="prometheus"}[5m]`, in this example, we select all the values recorded less than 5m ago for all time series that have the metric name and job label set.
 
 The `offset` modifier allows changing the time offset for individual instant and range vectors in a query.
 
@@ -376,7 +376,7 @@ Visualize rolling averages or trends.
 
 ## Aggregating over dimensions
 
-Combine series by removing labels and aggregating across them, example: Sum all HTTP requests, regardsless of job or instances:
+Combine series by removing labels and aggregating across them, example: Sum all HTTP requests, regardless of job or instances:
 
 ```
 sum(http_requests_total)
@@ -398,11 +398,11 @@ You can use `on()` to match only specific labels, use `ignoring()` to exclude sp
 
 Analyzing distributions, such as request durations or response sizes.
 
-Histograms and summaries are more complex metric types. Not only does a single histogram or summary create a multitude of timeseries it is also more difficult to use these metric types correctly.
+Histograms and summaries are more complex metric types. Not only does a single histogram or summary create a multitude of time series, it is also more difficult to use these metric types correctly.
 
 Both of these sample observations, typically request durations or response sizes.
 
-A straight-forward use of histograms is to count observaitions failling into particular buckets of observation values.
+A straightforward use of histograms is to count observations falling into particular buckets of observation values.
 
 Two rules of thumb:
 
@@ -423,7 +423,7 @@ sum(rate(http_request_duration_seconds_count[5m])) by (job)
 
 You can use both summaries and histograms to calculate quantiles. Where 0 <= q <= 1. The 0.5 quantile is the median, the 0.9 quantile is the 90th percentile, and so on.
 
-Lets say we dont want to display the percentage of requests served within 300ms, but rather the 95th percentile of request durations. We can use the `histogram_quantile()` function to calculate this from a histogram:
+Let's say we don't want to display the percentage of requests served within 300ms, but rather the 95th percentile of request durations. We can use the `histogram_quantile()` function to calculate this from a histogram:
 
 ```
 histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket[5m])) by (le))
