@@ -1,4 +1,4 @@
-# The path to Golden Kubestronaut! ✨
+# Golden Kubestronaut preparations! ✨
 
 <p align="center">
 <img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/7ce3b701-0fb7-4565-b5a1-acda87aa7bd4" />
