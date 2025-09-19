@@ -1,5 +1,9 @@
 # The path to Golden Kubestronaut! ✨
 
+<p align="center">
+![alt text](images/image.png)
+</p>
+
 This repository contains exam preparation material i've used and created to become a [Golden Kubestronaut](https://training.linuxfoundation.org/resources/kubestronaut-program/). Note that this repository assumes that you've already taken the first five (to become a Kubestronaut)!
 
 _Note that this material might sometimes be complete sometimes not, it's a lot of notes to self but still structured to follow the exam topics, and there's of course absolutely no disclosure of the exam questions or anything related to the exams._
