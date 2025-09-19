@@ -4,9 +4,9 @@
 <img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/7ce3b701-0fb7-4565-b5a1-acda87aa7bd4" />
 </p>
 
-This repository contains exam preparation material i've used and created to become a [Golden Kubestronaut](https://training.linuxfoundation.org/resources/kubestronaut-program/). Note that this repository assumes that you've already taken the first five (to become a Kubestronaut)!
+This repository contains exam preparation material i've used and created to become a [Golden Kubestronaut](https://training.linuxfoundation.org/resources/kubestronaut-program/). I'm assuming that you've already taken the first five exams (to become a Kubestronaut)!
 
-_Note that this material might sometimes be complete sometimes not, it's a lot of notes to self but still structured to follow the exam topics, and there's of course absolutely no disclosure of the exam questions or anything related to the exams._
+_Note that this material might sometimes be complete sometimes not, it's a lot of notes to self but still structured to follow the exam topics, and to be **very** clear: there's of course no disclosure of the exam questions or brain dumps in this repository._
 
 Certifications covered in this repository:
 
