@@ -1,4 +1,4 @@
-# The path to Golden Kubestronaut!
+# The path to Golden Kubestronaut! ✨
 
 This repository contains exam preparation material i've used and created to become a [Golden Kubestronaut](). Note that this repository assumes that you've already taken the first five (to become a Kubestronaut)!
 
@@ -13,7 +13,7 @@ Certifications covered in this repository:
 5. [OTCA (OpenTelemetry Certified Associate)](OTCA/README.md)
 6. [CBA (Certified Backstage Associate)](CBA/README.md)
 7. KCA (Kyverno Certified Associate)
-8. ICA (Istio Certified Associate) - **not only multi-choice questions, also includes **
+8. ICA (Istio Certified Associate) - **not only multi-choice questions, also includes**
 9. LFCS (Linux Foundation Certified System Administrator)
 10. CNPA (Cloud Native Platform Engineering Associate) - **needed after the 15th of October 2025!**
 
