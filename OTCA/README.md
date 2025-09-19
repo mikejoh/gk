@@ -4,6 +4,8 @@ _This exam is an online, proctored, multiple-choice exam._
 
 ## Resources
 
+* <https://opentelemetry.io/docs/>
+
 ## Topics
 
 <details>
