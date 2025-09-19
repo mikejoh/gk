@@ -25,7 +25,16 @@ Backstage includes:
 
 ## Build and run Backstage projects locally
 
-
+To run and build Backstage projects locally you need:
+* Node.js
+  * Using `nvm`
+* `yarn`:
+  ```
+  corepack enable
+  yarn set version 4.4.1
+  ```
+* Docker
+* `git`
 
 </details>
 
