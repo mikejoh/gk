@@ -1,7 +1,7 @@
 # The path to Golden Kubestronaut! ✨
 
 <p align="center">
-<img width="1000" height="1000" alt="image" src="https://github.com/user-attachments/assets/7ce3b701-0fb7-4565-b5a1-acda87aa7bd4" />
+<img width="512" height="512" alt="image" src="https://github.com/user-attachments/assets/7ce3b701-0fb7-4565-b5a1-acda87aa7bd4" />
 </p>
 
 This repository contains exam preparation material i've used and created to become a [Golden Kubestronaut](https://training.linuxfoundation.org/resources/kubestronaut-program/). Note that this repository assumes that you've already taken the first five (to become a Kubestronaut)!
