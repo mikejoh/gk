@@ -1,0 +1,18 @@
+backstage:
+  image:
+    registry: docker.io
+    repository: mikejoh/my-backstage
+    tag: latest
+    pullPolicy: Always
+  extraEnvVarsSecrets:
+    - github-secret
+  extraEnvVars:
+    - name: BACKSTAGE_ENV
+      value: production
+  
+postgresql:
+  enabled: true
+  auth:
+    username: demo
+    password: secret
+
