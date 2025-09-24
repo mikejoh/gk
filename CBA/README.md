@@ -54,7 +54,13 @@ Dictionary:
 * `npm` is the node package manager.
 * `npx` is a tool for executing Node.js package executables without having to install them globally.
 
-## Local development workflows
+## `yarn` commands
+
+`yarn backstage-cli versions:bump` bump all @backstage packages and dependencies you're using to the latest versions.
+`yarn backstage-cli versions:bump --release next` the above command upgrade @backstage packages to the latest `main` release, for even later version (next release), add the `--release next` flag.
+`yarn backstage-cli versions:bump --pattern '@{backstage,roadiehq}/*'` bump 
+
+## Start Backstage locally
 
 _Note that i started of this exam prep on Arch Linux._
 
@@ -64,7 +70,88 @@ npx @backstage/create-app@latest
 yarn start # in your app directory
 ```
 
-Follow the guides here: <https://backstage.io/docs/getting-started/#admin> after setting up your first
+## Configure authentication using GitHub OAuth
+
+The default `guest` auth provider is not very useful.
+
+1. Create an [OAuth App](https://backstage.io/docs/getting-started/config/authentication#setting-up-authentication) over at GitHub.
+2. In your app-config add:
+
+```
+auth
+  environment: development
+  # see https://backstage.io/docs/auth/ to learn about auth providers
+  providers:
+    # See https://backstage.io/docs/auth/guest/provider
+    github:
+      development:
+        clientId: ${AUTH_GITHUB_CLIENT_ID}
+        clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+        signIn:
+          resolvers:
+          - resolver: usernameMatchingUserEntityName
+```
+
+_The `AUTH_*` env vars will be resolved for you when Backstage start, you just have to provide them, either via CLI or Kubernetes._
+
+3. In `packages/app/src/App.tsx` add:
+
+```
+import { githubAuthApiRef } from '@backstage/core-plugin-api';
+```
+
+and replace:
+
+```
+components: {
+  SignInPage: props => <SignInPage {...props} auto providers={['guest']} />,
+},
+```
+
+with:
+
+```
+components: {
+  SignInPage: props => (
+    <SignInPage
+      {...props}
+      auto
+      provider={{
+        id: 'github-auth-provider',
+        title: 'GitHub',
+        message: 'Sign in using GitHub',
+        apiRef: githubAuthApiRef,
+      }}
+    />
+  ),
+},
+```
+
+The `App.tsx` is where the Backend application is initialized and wiring everything together. Here you can customize:
+
+* Routes
+* Theming
+* API configuration
+* Sidebar
+* Feature flags
+
+Back to the `app-config.yaml` and the `auth`config, add:
+
+```
+...
+        signIn:
+          resolvers:
+            # Matches the GitHub username with the Backstage user entity name.
+            # See https://backstage.io/docs/auth/github/provider#resolvers for more resolvers.
+            - resolver: usernameMatchingUserEntityName
+...
+```
+
+This takes the user details provided by the auth provider and match that against a User in the Catalog - this will **match** the GitHub user name with the `metadata.name`value of a User in the Catalog.
+
+### Sign-in resolvers
+
+These are mappings of user identity from the third-party auth provider to a Backstage user identity.
 
 ## Use Docker to build a container image of a Backstage project
 
@@ -120,6 +207,29 @@ helm upgrade --install \
 * Configure Backstage
 * Deploy Backstage to production
 * Understand Backstage client-server architecture
+
+## Static configuration in Backstage
+
+Backstage provides a simple way to configure Backstage apps and plugins for both local development and production deployments.
+
+Configuration is stored in YAML files where the defaults are `app-config.yaml`, and `app-config.local.yaml` for local overrides.
+
+Setting the `BACKSTAGE_ENV` will load a configuration following this naming scheme: `app-config.<BACKSTAGE_ENV>.yaml`.
+
+Order of files are:
+
+1. `app-config.yaml`
+2. `app-config.<BACKSTAGE_ENV>.yaml`
+3. `app-config.local.yaml`
+4. `app-config.<BACKSTAGE_ENV>.local.yaml`
+
+other config files are loaded by passing `--config <path>` to the CLI. It's possible to point at a URL to fetch the configuration file.
+
+Special includes:
+
+* Env includes: `$env: MY_SECRET`
+* File includes: `$file: ./my-secret.txt`
+* Include external files: `$include: ./my-secrets.json#deployment.key`
 
 </details>
 
