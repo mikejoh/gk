@@ -326,6 +326,4 @@ backend.add(import('@backstage/plugin-catalog-backend-module-github'));
 
 There's also support for events, so you can subscribe to its relevant topics `github.push` and `github.repository`. To add this you need to create a webhook in GitHub and then installing and configuring the `@backstage/plugin-events-backend-module-github`.
 
-## YAML file format
-
 </details>
