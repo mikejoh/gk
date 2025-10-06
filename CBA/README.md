@@ -167,6 +167,12 @@ From the root of the repo execute:
 docker image build . -f packages/backend/Dockerfile --tag mikejoh/my-backstage:latest --progress=plain
 ```
 
+```
+docker push mikejoh/my-backstage:latest
+```
+
+If you're running in Kubernetes make sure you rollout restart your Deployment or simply delete the Backstage Pod.
+
 ## Deploy Backstage to Kubernetes for local testing and development
 
 1. Create a `kind` cluster:
