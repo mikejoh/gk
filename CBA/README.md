@@ -164,7 +164,7 @@ These are mappings of user identity from the third-party auth provider to a Back
 From the root of the repo execute:
 
 ```
-docker image build . -f packages/backend/Dockerfile --tag backstage
+docker image build . -f packages/backend/Dockerfile --tag mikejoh/my-backstage:latest --progress=plain
 ```
 
 ## Deploy Backstage to Kubernetes for local testing and development
