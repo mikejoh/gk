@@ -42,6 +42,10 @@ import { TechRadarPage } from '@backstage-community/plugin-tech-radar';
 import { githubAuthApiRef } from '@backstage/core-plugin-api';
 import { HomepageCompositionRoot } from '@backstage/plugin-home';
 import { HomePage } from './components/home/HomePage';
+import { UnifiedThemeProvider } from '@backstage/theme';
+import { myTheme } from './theme/myTheme';
+import LightIcon from '@material-ui/icons/WbSunny';
+import { MyPluginPage } from '@internal/plugin-my-plugin';
 
 const app = createApp({
   apis,
@@ -79,6 +83,15 @@ const app = createApp({
       />
     ),
   },
+  themes: [{
+    id: 'my-theme',
+    title: 'My Custom Theme',
+    variant: 'light',
+    icon: <LightIcon />,
+    Provider: ({ children }) => (
+      <UnifiedThemeProvider theme={myTheme} children={children} />
+    ),
+  }],
 });
 
 const routes = (
@@ -123,6 +136,7 @@ const routes = (
     <Route path="/catalog-graph" element={<CatalogGraphPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
     <Route path="/tech-radar" element={<TechRadarPage width={1500} height={800} />} />
+    <Route path="/my-plugin" element={<MyPluginPage />} />
   </FlatRoutes>
 );
 
