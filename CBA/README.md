@@ -623,4 +623,12 @@ yarn new
 
 and choose `frontend-plugin`.
 
+## Customizethe look-and-feel of your App
+
+Creating a Custom Theme is as easy as use the `createUnifiedTheme` function exported by `@backstage/theme` package.
+
+Use it to override some basic parameters of the default theme such as the color palette and font.
+
+
+
 </details>

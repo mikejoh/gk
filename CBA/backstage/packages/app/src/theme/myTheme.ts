@@ -3,13 +3,46 @@ import {
     createUnifiedTheme,
     genPageTheme,
     palettes,
+    defaultTypography,
     shapes,
 } from '@backstage/theme';
+
+import MyCustomFont from '../assets/fonts/hack-regular.woff2';
+
+const myCustomFont = {
+    fontFamily: 'Hack, sans-serif',
+    fontStyle: 'normal',
+    fontDisplay: 'swap',
+    fontWeight: 300,
+    src: `
+    local('hack-regular'),
+    url(${MyCustomFont}) format('woff2'),
+  `,
+};
 
 export const myTheme = createUnifiedTheme({
     ...createBaseThemeOptions({
         palette: {
             ...palettes.light,
+            fontFamily: 'Hack, sans-serif',
+            components: {
+                MuiCssBaseline: {
+                    styleOverrides: {
+                        '@font-face': [myCustomFont],
+                    },
+                },
+            },
+            typography: {
+                ...defaultTypography,
+                htmlFontSize: 16,
+                fontFamily: 'Roboto, sans-serif',
+                h1: {
+                    fontSize: 72,
+                    fontWeight: 700,
+                    marginBottom: 10,
+                },
+            },
+            defaultPageTheme: 'home',
             primary: {
                 main: '#343b58',
             },
