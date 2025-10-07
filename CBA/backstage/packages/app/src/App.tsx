@@ -45,7 +45,7 @@ import { HomePage } from './components/home/HomePage';
 import { UnifiedThemeProvider } from '@backstage/theme';
 import { myTheme } from './theme/myTheme';
 import LightIcon from '@material-ui/icons/WbSunny';
-import { MyPluginPage } from '@internal/plugin-my-plugin';
+import { GithubPlaygroundPage } from '@internal/plugin-github-playground';
 
 const app = createApp({
   apis,
@@ -136,7 +136,7 @@ const routes = (
     <Route path="/catalog-graph" element={<CatalogGraphPage />} />
     <Route path="/notifications" element={<NotificationsPage />} />
     <Route path="/tech-radar" element={<TechRadarPage width={1500} height={800} />} />
-    <Route path="/my-plugin" element={<MyPluginPage />} />
+    <Route path="/github-playground" element={<GithubPlaygroundPage />} />
   </FlatRoutes>
 );
 

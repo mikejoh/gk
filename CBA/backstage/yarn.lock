@@ -6667,6 +6667,31 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@internal/plugin-github-playground@workspace:^, @internal/plugin-github-playground@workspace:plugins/github-playground":
+  version: 0.0.0-use.local
+  resolution: "@internal/plugin-github-playground@workspace:plugins/github-playground"
+  dependencies:
+    "@backstage/cli": "npm:^0.34.4-next.2"
+    "@backstage/core-app-api": "npm:^1.19.1-next.0"
+    "@backstage/core-components": "npm:^0.18.2-next.2"
+    "@backstage/core-plugin-api": "npm:^1.11.1-next.0"
+    "@backstage/dev-utils": "npm:^1.1.15-next.2"
+    "@backstage/test-utils": "npm:^1.7.12-next.1"
+    "@backstage/theme": "npm:^0.6.9-next.0"
+    "@material-ui/core": "npm:^4.9.13"
+    "@material-ui/icons": "npm:^4.9.1"
+    "@material-ui/lab": "npm:^4.0.0-alpha.61"
+    "@testing-library/jest-dom": "npm:^6.0.0"
+    "@testing-library/react": "npm:^14.0.0"
+    "@testing-library/user-event": "npm:^14.0.0"
+    msw: "npm:^1.0.0"
+    react: "npm:^16.13.1 || ^17.0.0 || ^18.0.0"
+    react-use: "npm:^17.2.4"
+  peerDependencies:
+    react: ^16.13.1 || ^17.0.0 || ^18.0.0
+  languageName: unknown
+  linkType: soft
+
 "@internationalized/date@npm:^3.9.0":
   version: 3.9.0
   resolution: "@internationalized/date@npm:3.9.0"
@@ -15196,7 +15221,7 @@ __metadata:
     "@backstage/test-utils": "npm:^1.7.12-next.1"
     "@backstage/theme": "npm:^0.6.9-next.0"
     "@backstage/ui": "npm:^0.7.2-next.1"
-    "@internal/plugin-my-plugin": "workspace:^"
+    "@internal/plugin-github-playground": "workspace:^"
     "@material-ui/core": "npm:^4.12.2"
     "@material-ui/icons": "npm:^4.9.1"
     "@playwright/test": "npm:^1.32.3"

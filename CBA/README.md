@@ -4,6 +4,8 @@ _This exam is an online, proctored, multiple-choice exam._
 
 ## Resources
 
+* Make sure you perform at least [this](https://backstage.io/docs/tutorials/quickstart-app-plugin) technical tutorial!
+
 ## Topics
 
 <details>
@@ -14,6 +16,16 @@ _This exam is an online, proctored, multiple-choice exam._
 * Compile a Backstage project with TypeScript
 * Download and install dependencies for a Backstage project with NPM/Yarn
 * Use Docker to build a container image of a Backstage project
+
+![alt text](image.png)
+
+## System model
+
+* **Domain** - a bounded context
+* **System** - Collection of resources and coimponents that exposes one or several APIs.
+* **Component** - Piece of software, can be tracked in source control.
+* **API** - Implemented by components and form boundaries between components and systems.
+* **Resource** - Infrastructure a system needs to operate.
 
 What is Backstage? It's an open source _framework_ for building developer _portals_. Powered by a centralized software catalog. Backstage unifies all your infrastructure tooling, services and documentation to create a streamlined development environment from end to end.
 
@@ -347,6 +359,13 @@ This will of errors with a level of `warn`.
 
 ## YAML file format
 
+The envelope:
+
+* `apiVersion` - required
+* `kind` - required
+* `metadata` - required
+* `spec` - varies
+
 The `metadata`:
 
 * `name`
@@ -404,6 +423,16 @@ Catalog processors analyze the entity descriptor data and it's surroundings.
   }
 }
 ```
+
+### The Kinds
+
+`Component`: Describes a software component, unit of software.
+`API`: Describes an interface that can be exposed by a component.
+`Group`: Organizational entity, such as for example a team, business unit.
+`User`: Describes a person, employee or contractor, belongs to a Group.
+`Resource`: Describes the infrastructure a system needs to operate.
+`System`: Collection of resources and components. That may expose or consume one or several APIs.
+`Location`: A marker that references other place to look for catalog data.
 
 ## Annotations
 
@@ -563,6 +592,13 @@ backend.add(import('@backstage/plugin-catalog-backend-module-github'));
 
 There's also support for events, so you can subscribe to its relevant topics `github.push` and `github.repository`. To add this you need to create a webhook in GitHub and then installing and configuring the `@backstage/plugin-events-backend-module-github`.
 
+## Good-to-know
+
+* **Component**:
+
+1. A modular independent reuseable software-based unit that encapsulates specific functionality.
+2. A software product that Backstage manages in the Software Catalog. Can be a service, website, library, data pipeline or any other software.
+
 </details>
 
 <details>
@@ -572,5 +608,19 @@ There's also support for events, so you can subscribe to its relevant topics `gi
 * Customizing Backstage plugins
 * Make changes to React code in Backstage App
 * Using Material UI components
+
+Backstage orchestrates a cohesive single-page application by seamlessly integration various plugins.
+
+## Structure of a plugin
+
+## Integrate plugin into the Coftware Catalog
+
+To create a plugin:
+
+```
+yarn new
+```
+
+and choose `frontend-plugin`.
 
 </details>
