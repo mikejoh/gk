@@ -450,11 +450,17 @@ Catalog processors analyze the entity descriptor data and it's surroundings.
 ### The Kinds
 
 `Component`: Describes a software component, unit of software.
+
 `API`: Describes an interface that can be exposed by a component.
+
 `Group`: Organizational entity, such as for example a team, business unit.
+
 `User`: Describes a person, employee or contractor, belongs to a Group.
+
 `Resource`: Describes the infrastructure a system needs to operate.
+
 `System`: Collection of resources and components. That may expose or consume one or several APIs.
+
 `Location`: A marker that references other place to look for catalog data.
 
 ## Annotations
