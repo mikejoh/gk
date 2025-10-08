@@ -69,8 +69,31 @@ Dictionary:
 ## `yarn` commands
 
 `yarn backstage-cli versions:bump` bump all @backstage packages and dependencies you're using to the latest versions.
+
 `yarn backstage-cli versions:bump --release next` the above command upgrade @backstage packages to the latest `main` release, for even later version (next release), add the `--release next` flag.
+
 `yarn backstage-cli versions:bump --pattern '@{backstage,roadiehq}/*'` bump
+
+`yarn backstage-cli` summary:
+
+```
+  package [command]  package
+  repo [command]     repo
+  build-workspace    Builds a temporary dist workspace from the provided packages
+  config:docs        Browse the configuration reference documentation
+  config [command]   config
+  config:print       Print the app configuration for the current package
+  config:check       Validate that the given configuration loads and matches schema
+  config:schema      Print the JSON schema for the given configuration
+  create-github-app  Create new GitHub App in your organization.
+  info               Show helpful information for debugging and reporting bugs
+  versions:migrate   Migrate any plugins that have been moved to the @backstage-community namespace
+                     automatically
+  versions:bump      Bump Backstage packages to the latest versions
+  migrate [command]  migrate
+  new                Open up an interactive guide to creating new things in your app
+  help [command]     display help for command
+```
 
 ## Start Backstage locally
 
