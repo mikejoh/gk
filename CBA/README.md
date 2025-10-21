@@ -1641,12 +1641,12 @@ Read-only and directional.
 
 Built-in relationships:
 
-* `providesApi` and `apiProvidedBy`
-* `consumesApi` and `apiConsumedBy`
-* `dependsOn` and `dependencyOf`
-* `parentOf` and `childOf`
-* `memberOf` and `hasMember`
-* `partOf`
+* `providesApi` (Component or system provides an API for consumption) and `apiProvidedBy`
+* `consumesApi` (Component or system consumes an API) `apiConsumedBy`
+* `dependsOn` (website depndes on a library) and `dependencyOf`
+* `parentOf` (build trees with entities, orgs with groups) and `childOf`
+* `memberOf` (used for users and groups) and `hasMember`
+* `partOf` Component that is part of a system or domain!
 
 ## Ownership
 
