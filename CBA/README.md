@@ -1722,4 +1722,38 @@ Categories of plugins:
 
 Finally, most plugins will require you to add their UI into your instance’s frontend using React. For example, adding a link in a navigation menu, or a widget on the entity page. Some plugins allow you to customize these widgets by passing props into them.
 
+Backstage architecture supports thress types of plugins:
+
+* Standalone
+* Service backed
+* Third-party backed
+
+Software Catalog is a service backed plugin.
+
+# Software Catalog System Model
+
+The system model behind the software catalog is based on _entities_ and it models two main types:
+
+* Core entities
+* Organizational entities
+
+Core:
+
+* `Components`
+* `APIs`
+* `Resources`
+
+Organizationl:
+
+* `User`
+* `Group`
+
+![alt text](image-3.png)
+
+There are three additional items that can be part of the system model:
+
+* `Location` - A marker that references other places to look for catalog data.
+* `Type` - It has no set meaning.
+* `Template` - Describes both the parameters that are rendered in the frontend part of the scaffolding wizard
+
 <details>
