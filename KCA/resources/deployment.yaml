@@ -1,0 +1,30 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: three-containers-deployment
+  labels:
+    app: my-app
+    color: blue
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: my-app
+  template:
+    metadata:
+      labels:
+        app: my-app
+        color: blue
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx:latest
+          ports:
+            - containerPort: 80
+        - name: redis-container
+          image: redis:latest
+          ports:
+            - containerPort: 6379
+        - name: busybox-container
+          image: busybox:latest
+          command: ["/bin/sh", "-c", "while true; do echo 'Hello from BusyBox'; sleep 10; done"]    
