@@ -669,6 +669,218 @@ Kyverno solves this issue by supporting automatic generation of policy rules for
 * Resource Selection
 * Common Policy Settings for Kyverno Rules
 
+## Applying Policy in Cluster
+
+You can apply policies in three different ways:
+
+* In Clusters, when installing Kyverno it runs as a dynamic admission controller in a Kubernetes cluster. You can create policies directly with e.g. `kubectl apply -f policy.yaml`. Exceptions to polcies shall be added as `PolicyException` resources. Cleanup policies is another resource used to remove existing resources based upon a definition and schedule.
+* In Pipelines, use the `kyverno` CLI to apply polcies to YAML resource manifest files as part of a software delivery pipeline. Allows for integrating Kyverno into GitOps style workflows and checks for policy compliance of resource manifests before they are committed to version control and applied to clusters.
+* Via APIs, Kyverno JSON policies and the new ValidatingPolicy and ImageValidatingPolicy types can be applied to _any_ JSON payloads. Policies can be applied via a Goland SDK or web service.
+
+## Resource Selection
+
+There's a couple of ways to identify and filter resources for rule evaluation. The `match` and `exclude` filter control the **scope** to which rules are applied. They have the **same** structure and can each contain **ONLY ONE** of the two elements:
+
+* `any` - specify filters which are **OR**ed together. ANYORED.
+* `all` - specify filters which are **AND**ed together. ALLANDED.
+
+### Resource filters
+
+The following resource filters can be specified under an `any` or `all`clause:
+
+* `resources` - select by name, namespaces, kinds
+* `subjects` - select users, groups and service accounts
+* `roles` - namespaced roles
+* `clusterRoles` - cluster-wide roles
+
+_At least one element must be specified in a `match.(any|all).resources.kinds` or `exclude` block._
+
+_Wildcards are supported in the `resources.kinds` and `subject` fields._
+
+Supported formats:
+
+* Group/Version/Kind
+* Version/Kind
+* Kind
+
+Wildcard examples in the `kinds` field:
+
+* `Group/*/Kind`
+* `Group/*/*`
+* `*/Kind`
+* `*`
+
+Use a `/` or `.` as a seprator between parent and subresource.
+
+Using parent resources followed by its subresource is **neccessary** to be explicit in the matching decision.
+
+In the AdmissionReview request flow:
+
+validation/mutation webhook -> Check if resource and user information matches OR should be excluded from processing -> Process and apply logic to mutate, validate or generate resources.
+
+### Match statements
+
+IN EVERY RULE THERE MUST BE A SINGLE `match` STATEMENT to function as the filter to which the rule will apply!
+
+Example:
+
+```yaml
+match:
+  any:
+  - resources:
+      kinds: 
+      - Service
+      names: 
+      - staging
+      operations:
+      - CREATE
+  - resources:
+      kinds: 
+      - Service
+      namespaces:
+      - prod
+      operations:
+      - CREATE
+```
+
+This match statement matches all resources that EITHER have the kind Service with name `staging` OR have the kind Service and being created in the `prod` namespace.
+
+The `operations[]` field are optimal but **recommeneded**.
+
+By combining multiple elements in the `match` statement you can be more selective as to which resources you wish to process.
+
+```yaml
+match:
+  any:
+  - resources:
+      names: 
+      - "prod-*"
+      - "staging"
+      kinds:
+      - Service
+      operations:
+      - CREATE
+  - resources:
+      kinds:
+      - Service
+      operations:
+      - CREATE
+    subjects:
+    - kind: User
+      name: dave
+```
+
+Here we've filtered out Services that begin with the text `prod-` OR have the name `staging`. The second block matches Servies being created by the `dave` user regardless of the of the Servbice.
+
+With GVK you can:
+
+```yaml
+match:
+  any:
+  - resources:
+      kinds:
+      - networking.k8s.io/v1/NetworkPolicy
+
+OR
+
+match:
+  any:
+  - resources:
+      kinds:
+      - v1/NetworkPolicy
+```
+
+Supported formats:
+
+* `*`
+* `*pattern*`
+* `*pattern`
+* `pattern?`
+* `patte?rn`
+
+Example:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-labels
+spec:
+  background: false
+  rules:
+  - name: check-for-labels
+    match:
+      any:
+      - resources:
+          kinds:
+          - "*"
+          operations:
+          - CREATE
+    validate:
+      failureAction: Audit
+      message: "The label `app.kubernetes.io/name` is required."
+      pattern:
+        metadata:
+          labels:
+            app.kubernetes.io/name: "?*"
+```
+
+All resources kind are checked for the existence of a label having key `app.kubernetes.io/name` during CREATE operations. The **problem** with this is that it will send all resources to Kyverno for evaluation which can be a performance issue.
+
+You can also use a `namspaceSelector` to select/exclude namespaces based on labels:
+
+```yaml
+match:
+  any:
+  - resources:
+      kinds:
+      - Pod
+      namespaceSelector:
+        matchLabels:
+          organization: engineering
+```
+
+### Match a Deployment or StatefulSet with a specific label
+
+```yaml
+match:
+  any:
+  # AND across kinds and namespaceSelector
+  - resources:
+      # OR inside list of kinds
+      kinds:
+      - Deployment
+      - StatefulSet
+      operations:
+      - CREATE
+      - UPDATE
+      selector:
+        matchLabels:
+          app: critical
+```
+
+Uses the following logic: **"AND across types but an OR within list types"**.
+
+Remember this one: _RULES ARE APPLIED IN THE ORDER OF DEFINITION!_
+
+### Combining `match` and `exclude`
+
+In some cases where a subset of resources selected in a `match` block need to be omitted from processing, you may optionally use an `exclude` block.
+
+ALL MATCH AND EXCLUDE CONDITIONS MUST BE SATISFIED FOR A RESOURCE TO BE SELECTED FOR THE POLICY RULE!
+
+The default operations for validating resources are:
+
+* CONNECT
+* CREATE
+* UPDATE
+* DELETE
+
+For mutating resources:
+
+* CREATE
+* UPDATE
+
 </details>
 
 <details>
@@ -690,6 +902,7 @@ Kyverno solves this issue by supporting automatic generation of policy rules for
 
 <details>
   <summary>Policy Management (10%)</summary>
+  
 * Policy Reports
 * PolicyExceptions
 * Kyverno Metrics
