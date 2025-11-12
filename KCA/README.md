@@ -898,6 +898,318 @@ For mutating resources:
 * Cleanup Policies
 * Common Expression Language (CEL)
 
+## Tips and Tricks
+
+* Use `kubectl explain` to explain and explore the various parts and fields of a Kyverno policy
+* Use the VS Code OpenAPIV3 integration to get hints and autocompletion when writing policies
+* Make use of `kyverno` CLI to test policies out in advance
+* When developing your `validate` polcies, it's easiest to set `failureAction` to `Enforce` so when testing you can see the results immediately
+* Before deploying to production, change `failureAction` to `Audit` to avoid disruption
+
+## Validation Rules
+
+These are probably the most common and the main use case for admission controllers such as Kyverno.
+
+If agreed == resource is created. Otherwise blocked.
+
+These rules responds determined by the `failureAction` field:
+
+* `Enforce` - block.
+* `Audit` - allowed and recorded in a policy report.
+
+Validation rules in audit mode can be used to get a report on matching resources which violate the rule(s) both on:
+
+* Initial creation
+* During periodic background scans
+
+To validate resource data, define a pattern in the validation rule, for more advanced processing define a `deny` element with conditions that controls when to allow or deny the request.
+
+### Failure Action
+
+**REMEMBER:** _For preexisting resources, which violates a newly created policy, Kyverno will allow subsequent updates to those resources. However, if an update to a resource makes it compliant (allowe), subsequent updates that violates the rule after that will be blocked!_
+
+This beahviour can be disabled using:
+
+* Set `validate.allowExistingViolations` to `false` in an `Enforce` rule.
+
+Tip: Set `spec.emitWarning` to `true` to show audit policy violations in admissions responses.
+
+### Failure Action Overrides
+
+Use `failureActionOverrides` to specify which actions to apply per Namespace. Only available in `ClusterPolicy`.
+
+Example:
+
+```yaml
+      validate:
+        failureAction: Audit
+        failureActionOverrides:
+          - action: Enforce     # Action to apply
+            namespaces:       # List of affected namespaces
+              - default
+          - action: Audit
+            namespaces:
+              - test
+```
+
+Special overrides for specific Namespaces.
+
+### Patterns
+
+Following rules are followed when processing the overlay pattern:
+
+1. Validation will fail if a field is deined in pattern and does not exist in the config.
+2. Undefined fields are treated as wildcards
+3. A validation pattern field with the wildcard `*` will match zero or more alphanumeric characters. Empty values are matched. Missing fields are not matched.
+4. A validation pattern field with the wildcard `?` will match any single alphanumeric character. Empty values are not matched. Missing fields are not matched.
+5. A validation pattern field with the wildcard `?*` will match any single alphanumeric character. Empty or missing fields are not matched.
+6. A validation pattern field with the value `null` or `""` requires that the field not be defined or has no value.
+7. Validation of child values is only performed if the parent matches the pattern.
+
+#### Anchors
+
+* Conditional `()`
+* Equality `=()`
+* Existence - `^()` - only list/arrays
+* Negation - `X()`
+* Global - `<()`
+
+#### `anyPattern`
+
+In some cases `securityContext` can be defined at the Pod or Container level. anyPattern is a logical OR across multiple patterns.
+
+Do not use negated conditions.
+
+#### Deny rules
+
+Example:
+
+```yaml
+validate:
+  message: Main message is here.
+  deny:
+    conditions:
+      any:
+      - key: "{{ request.object.data.team }}"
+        operator: Equals
+        value: eng
+        message: The expression team = eng failed.
+      - key: "{{ request.object.data.unit }}"
+        operator: Equals
+        value: green
+        message: The expression unit = green failed.
+```
+
+Deny rules are more powerful and expressive than simple patterns but are also more **complex** to write, use deny rules WHEN:
+
+* You need advanced selection logic with multiple "if" conditions
+* You need access to the full contents or the AdmissionReview
+* You need access to more built-in variables
+* You need access to the compelte JMESPath filtering system
+
+The expressions looks like the ones used in Kubernetes selectors and `matchExpressions`.
+
+#### Pod Security
+
+There's a subrule type called `podSecurity`. Which eases the pain of writing and applying PSP profiles.
+
+For example, this policy enforces the latest version of the Pod Security Standards baseline profile in a single rule across the entire cluster:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: psa
+spec:
+  background: true
+  rules:
+  - name: baseline
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    validate:
+      failureAction: Enforce
+      podSecurity:
+        level: baseline
+        version: latest
+```
+
+#### ValidatingAdmissionPolicies
+
+Provides a declarative, in-process option for validating admission webhooks using the CEL to perform validation checks **directly in the Kubernetes API server**.
+
+Designed to perform basic validation checks for an admission request.
+
+Kyverno policies can be used to generate and manage lifecycle of Kubernetes ValidatingAdmissionPolcies. Extends Kyvernos reporting and testing capabilities.
+
+Example:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-host-path
+spec:
+  background: false
+  rules:
+    - name: host-path
+      match:
+        any:
+        - resources:
+            kinds:
+              - Deployment
+      validate:
+        failureAction: Enforce
+        cel:
+          expressions:
+            - expression: "!has(object.spec.template.spec.volumes) || object.spec.template.spec.volumes.all(volume, !has(volume.hostPath))"
+              message: "HostPath volumes are forbidden. The field spec.template.spec.volumes[*].hostPath must be unset."
+```
+
+Check the `status` object to see if theres a corresponding VAP generated.
+
+Only ClusterPolicy can create these, since VAPs are cluster scoped.
+
+#### Kyverno JSON Assertion
+
+`assert` is a subrule type that allows users to use Kyverno JSON assertion trees for resource validation.
+
+Example of a policy that ensures that a Pod does not use the default service account:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-default-sa
+spec:
+  validationFailureAction: Enforce
+  rules:
+  - match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    name: disallow-default-sa
+    validate:
+      message: default ServiceAccount should not be used
+      assert:
+        object:
+          spec:
+            (serviceAccountName == 'default'): false
+```
+
+## Preconditions
+
+## Background Scans
+
+## Mutation Rules
+
+## Generation Rules
+
+## VerifyImage Rules
+
+## Variables & API Calls in Policies
+
+## JSON Patches
+
+## Autogen Rules
+
+## Cleanup Policies
+
+## Common Expression Language (CEL)
+
+`cel` is a subrule type in Kyverno. This subrule type allows users to write CEL expressions for resource validation. This was introduced in Kubernetes originally to write validation rules for CRDs.
+
+It's used in `ValidatingAdmissionPolicies`. Standard `match` and `exclude` processing is available just like with other rules. This subrule type is enabled when a validate rule is written with a `cel` object.
+
+Example:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-deployment-replicas
+spec:
+  background: false
+  rules:
+    - name: check-deployment-replicas
+      match:
+        any:
+        - resources:
+            kinds:
+              - Deployment
+      validate:
+        failureAction: Enforce
+        cel:
+          expressions:
+            - expression: "object.spec.replicas < 4"
+              message:  "Deployment spec.replicas must be less than 4."
+```
+
+_`validate.cel` subrules also supports `autogen` rules for higher-level controllers that directly or indirectly manage Pods: Deployment, DaemonSet, StatefulSet, Job, and CronJob resources._
+
+A policy can define `cel.paramKind`, which outlines the GVK of the parameter resource, and then associate the policy with a specific parameter resource via `cel.paramRef`:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: check-deployment-replicas
+spec:
+  background: false
+  rules:
+    - name: check-deployment-replicas
+      match:
+        any:
+        - resources:
+            kinds:
+              - Deployment
+      validate:
+        failureAction: Enforce
+        cel:
+          paramKind: 
+            apiVersion: rules.example.com/v1
+            kind: ReplicaLimit
+          paramRef:
+            name: "replica-limit"
+            parameterNotFoundAction: "Deny"
+          expressions:
+            - expression: "object.spec.replicas < params.maxReplicas"
+              messageExpression:  "'Deployment spec.replicas must be less than ' + string(params.maxReplicas)"
+```
+
+#### CEL Preconditions
+
+Preconditions allows for more fine-grained selection of resources than the optiosn allowed by match and exclude statements.
+
+_For example, if you wished to apply policy to all Kubernetes Services which were of type NodePort, since neither the match/exclude blocks provide access to fields within a resource’s spec, a CEL precondition could be used._
+
+Example:
+
+```yaml
+rules:
+  - name: validate-nodeport-trafficpolicy
+    match:
+      any:
+      - resources:
+          kinds:
+            - Service
+    celPreconditions:
+        - name: check-service-type
+          expression: "object.spec.type.matches('NodePort')"
+    validate:
+      cel:
+        expressions:
+        - expression: "object.spec.externalTrafficPolicy.matches('Local')"
+          message: "All NodePort Services must use an externalTrafficPolicy of Local."
+```
+
+#### CEL Variables
+
+ _A variable is a named expression that can be referred later as variables in other expressions._
+
 </details>
 
 <details>
