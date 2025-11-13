@@ -1102,21 +1102,412 @@ spec:
 
 ## Preconditions
 
+Preconditions allows for more fine-grained selection of resources than the options allowed by `match` and `exclude` statements.
+
+Consists of one or more expressions which are evaluated after a resources has been **successfully matched** AND not **excluded by a rule**.
+
+They're powerful since they allow you to access variables, JMESPath filters, operators and other constructs.
+
+When preconditions are **evaluated to and overall TRUE** result processing of the body **begins**.
+
+Similar to deny rules becuase they are built of the same type of expressions and have the same fields.
+
+When used in rule types that **supports reporting** a result will be scored as a `skip` if a resources is matched by a rule but discarded by the combined preconditions.
+
+### Any and All Statements
+
+Preconditions are evaluated by **nesting** the expressions under `any` and/or `all` statements. This gives you further power in building more precise logic for how the rule is triggered.
+
+If any of the `any`/`all` statement blocks does not evaluate to TRUE, preconditions will not be satisfied.
+
+### Operators
+
+Does not work on arrays:
+
+* Equals
+* NotEquals
+
+Most commonly used:
+
+* AnyIn
+* AllIn
+* AnyNotIn
+* AllNotIn
+
+Can be used with Kubernetes resources quantities:
+
+* GreaterThan
+* GreaterThanOrEquals
+* LessThan
+* LessThanOrEquals
+
+Duratons operators can be used for things usch as validating an annotation that is a duration unit:
+
+* DurationGreaterThan
+* DurationGreaterThanOrEquals
+* DurationLessThan
+* DurationLessThanOrEquals
+
+Example:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: resource-quantities
+spec:
+  background: false
+  rules:
+  - name: memory-limit
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+    preconditions:
+      any:
+      - key: "{{request.object.spec.containers[0].resources.requests.memory}}"
+        operator: LessThan
+        value: 1Gi
+```
+
+### Wildcard Matches
+
+Wildcard matches are possible!
+
 ## Background Scans
+
+Periodically reapply policies to exsting resources for reporting.
+
+REMEMBER THAT: Background scans are handled by the **reports controller** and not the **background controller**!
+
+Background scanning are enabled by default in `Policy` and `ClusterPolicy` resources through the `spec.background` field.
+
+Default periodically, one hour by default. Change the `backgroundScanInterval` field for the Reports Controller.
+
+Behavior:
+
+| Setting | | New | Existing |
+|---|---|---|
+| `background: true` | `failureAction: Enforce` | Pass only | Report |
+| `background: true` | `failureAction: Audit` | Report | Report |
+| `background: false` | `failureAction: Enforce` | Pass only | None |
+| `background: false` | `failureAction: Audit` | Report | None |
+
+_Roles, ClusterRoles, and Subjects in `match` and `exclude` statements, cannot be applied to existing resources in the background scanning!_
 
 ## Mutation Rules
 
+A `mutate` rule can be used to modify matching resources and is written as either:
+
+* RFC 6902 JSON Patch
+* Strategic merge patch
+
+By using the JSONPatch RFC 6902 format you can make **precise** change to the resources. Kubernetes will not allow mutations of resource fields such as:
+
+* name
+* namespace
+* uid
+* kind
+* apiVersion
+
+REMEMBER: **Mutations occures BEFORE validation!**
+
+### JSON 6902 JSON patch
+
+Example of a Json6902 patch mutation rule:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: policy-patch-cm
+spec:
+  rules:
+    - name: pCM1
+      match:
+        any:
+        - resources:
+            names:
+              - config-game
+            kinds:
+              - ConfigMap
+      mutate:
+        patchesJson6902: |-
+          - path: "/data/ship.properties"
+            op: add
+            value: |
+              type=starship
+              owner=utany.corp
+          - path: "/data/newKey1"
+            op: add
+            value: newValue1
+```
+
+REMEMBER: **Mutations using this patching is NOT translated int higher-level Pod controllers**.
+
+### Strategic Merge Patch
+
+`kubectl` uses a strategic merge patch when you use the `kubectl patch` command.
+
+Mutation rules written with this style, if the match on Pod, are subject to **auto-generation** rules for Pod controllers!
+
+### Anchors
+
+There's three types of anchors supported in mutation overlay rules:
+
+* Conditional: `()` - Use the tag and value as an “if” condition.
+* Add if not present: `+()` - Add the tag value if the tag is not already present. Not to be used for arrays/lists unless inside a foreach statement.
+* Global: `<()` - Add the pattern when the global anchor is true
+
+Processing flow and combinations:
+
+1. First, all conditial anchors are processed. Stops when returned `false`. Proceeds only if **all** cond anchors return `true`.
+2. Next, all tag-values without anchors and all add anchor tags are processed to apply the mutation.
+
+### Mutate Existing resources
+
+Can be patched with `patchStrategicMerge` and `patchesJson6902`.
+
+Mutation of existing policies are applied in the background (via the Background Controller).
+
+Two important implications:
+
+1. Mutation for existing resources is an asynchronous process.
+2. Custom permissions are almost always required.
+
+REMEMBER: **Mutation of existing Pods is limited to mutable fields only.**
+
+REMEMBER: **If you set `mutateExistingOnPolicyUpdate` to `true`, Kyverno will mutate the existing secret on policy CREATE and UPDATE AdmissionReview events.**
+
+When `name` and/or `namespace` fields are omitted in the `targets` list, **it implies `*`**.
+
+### Mutate Rule Ordering (Cascading)
+
+In some cases it might be desired to have multiple levels of mutation rules apply on incoming resources.
+
+Example:
+
+```yaml
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: database-type-labeling
+spec:
+  rules:
+    - name: assign-type-database
+      match:
+        any:
+        - resources:
+            kinds:
+            - Pod
+      mutate:
+        patchStrategicMerge:
+          metadata:
+            labels:
+              type: database
+          spec:
+            (containers):
+            - (image): "*cassandra* | *mongo*"
+```
+
 ## Generation Rules
+
+Create new Kubernetes resources based on a policy and optionally keep them in-sync.
+
+A generate rule can be used to create new Kubernetes resources in response to some other event such as resource:
+
+* Creation
+* Update
+* Or updating a policy itself
+
+Useful to create supporting resources such as new `RoleBindings` or `NetworkPolicies`.
+
+Common use cases for generate rules:
+
+* Namespace provisioner
+* Retroactive creation of NetworkPolicies
+
+Generate rules come in **two** flavors:
+
+1. Apply to admission events that occur across the cluster
+2. Apply to existing resources
+
+Supports `match` and `exclude`.
+
+Can keep generated resources in sync to prevent tampering by use of `synchornize` property. When `true` the generated resources is kept in-sync with the source resource.
+
+Kyverno can optionally use `server-side apply` when generating the resource.
+
+### Data Source
+
+The **source** of a generated resource may be defined in the Kyverno policy/rule directly.
+
+The `orphanDownStreamOnPolicyDelete` property can be used to preserve generated resources on policy/rule deletion. Used to preserve or delete orphaned resources of generate rules.
+
+### Clone Source
+
+When a generate policy should take the source from a resource which already exists in the cluster, a `clone` object is used instead of a `data` object.
+
+Kyverno needs to add labels to the clone source in order to track changes.
 
 ## VerifyImage Rules
 
+Check container image signatures and attestations for software chain security.
+
+Each rule contains the following common configurations attributes:
+
+* `type` - signature type
+* `imageReferences` - image reference pattern to match
+* `skipImageReferences` - list of image reference patterns
+* `required` - enforce that all matching images are verified
+* `mutateDigest`: converts tags to digests for matching images
+* `verifyDigest`: enforces that digests are used for matching images
+* `repository`: use a different repository for fetching signatures
+* `imageRegistryCredentials`: use specific registry credentials for this policy.
+
+Contains a list of attestors to check the attached image signature. Depends on the tool used to sign the image e.g. Cosign.
+
+Attestatations are signed metadata.
+
+**The rule mutates matching images to add the image digest when `mutateDigest` is set to `true`.**
+
+Enable TTL cache for verified images: `imageVerifyCacheEnabled`
+
 ## Variables & API Calls in Policies
+
+Defining and using variables in policies from multiple sources!
+
+Variables **makes policies smarter and reusable** by enabling references to data in the policy definition.
+
+Example:
+
+```yaml
+- name: mountpath
+  variable:
+    jmesPath: request.object.metadata.annotations.optional || '/custom/string/{{request.object.metadata.annotations.mandatory"}}'
+```
+
+### Pre-defined variables
+
+Kyverno automatically creates a few usefule variables and makes them available within rules:
+
+1. `serviceAccountName`
+2. `serviceAccountNamespace`
+3. `request.roles`
+4. `request.clusterRoles`
+5. `images`
+
+### Variables from policy definitions
+
+```yaml
+  validate:
+    failureAction: Enforce
+    message: "Port number for the livenessProbe must be less than that of the readinessProbe."
+    pattern:
+      spec:
+        ^(containers):
+        - livenessProbe:
+            tcpSocket:
+              port: "$(./../../../readinessProbe/tcpSocket/port)"
+```
+
+### Escaping Variables
+
+In some cases you wish to write a rule containing a variable for action on by another program or process flow. Use leading `\`, JMESPAth notationcan alsobe escaped usingthe same syntax.
+
+### Variables from external data sources
+
+Some policy decisions require access to cluster resources and data managed by other Kubernetes controllers or external applications. For these types of policies, Kyverno allows HTTP calls to the Kubernetes API server and the use of ConfigMaps.
+
+### Evaluation Order
+
+* Rule context
+* Rule preconditions
+* Rule definitions:
+  * Validation patterns
+  * Validation deny rules
+  * Mutate strategic merge patches (patchesStrategicMerge)
+  * Generate resource data definitions
+  * verifyImages definitions
+
+Variables are not supported in the `match` and `exclude` elements!
 
 ## JSON Patches
 
 ## Autogen Rules
 
+Automatically generate rules for Pod controllers.
+
+Pod are one of the most common object types in Kubernetes and as such are the focus of most types of validation rules. But creation of Pod directly is almost never done as it is considered an anti-pattern.
+
+REMEMBER: Auto-gen rules also cover ReplicaSet and ReplicationControllers. This is important for understanding the scope of auto-generated policies.
+
+Rule auto-generation behavior is controlled by the policy annotation `pod-policies.kyverno.io/autogen-controllers`.
+
+Example:
+
+```yaml
+pod-policies.kyverno.io/autogen-controllers=Deployment,Job.
+```
+
+Kyverno skips generating Pod controller rules whenever the following `resources` fields/objects are specified in a `match` or `exclude` block:
+
+* names
+* selector
+* annotations
+
+### Exclusion by Metadata
+
+```yaml
+rules:
+  - name: validate-resources
+    match:
+      any:
+      - resources:
+          kinds:
+            - Pod
+    exclude:
+      any:
+      - resources:
+          annotations:
+            policy.test/require-requests-limits: skip
+```
+
+_When Kyverno sees these types of fields as mentioned above it skips auto-generation for the rule._
+
 ## Cleanup Policies
+
+Delete matching resources based on a schedule!
+
+Kyverno has the ability to cleanup existing resources in a cluster in two different ways:
+
+* Declarative policy definition in either a `ClusterPolicy` or `ClusterCleanupPolicy`
+* Reserved time-to-live (TTL) label added to a resource
+
+Example:
+
+```yaml
+apiVersion: kyverno.io/v2
+kind: ClusterCleanupPolicy
+metadata:
+  name: cleandeploy
+spec:
+  match:
+    any:
+      - resources:
+          kinds:
+            - Deployment
+          selector:
+            matchLabels:
+              canremove: "true"
+  conditions:
+    any:
+      - key: "{{ target.spec.replicas }}"
+        operator: LessThan
+        value: 2
+  schedule: "*/5 * * * *"
+```
 
 ## Common Expression Language (CEL)
 
@@ -1218,5 +1609,99 @@ rules:
 * Policy Reports
 * PolicyExceptions
 * Kyverno Metrics
+
+## Policy Reports
+
+Policy reports are CRDs, generated and managed automatically by Kyverno. Contains results of applying matching Kubernetes resource to Kyverno ClusterPolicy or Policy resources.
+
+Generated are created based on two different triggers:
+
+* An admission event, CREATE, UPDATE or DELETE.
+* The result of a background scan
+
+Kyverno uses a standard and open format published by the Kubernetes Policy working group which proposes a common policy report format across Kubernetes tools.
+
+```yaml
+--enableReporting=validate,mutate,mutateExisting,generate,imageVerify
+```
+
+Result logic:
+
+Result:
+
+* `pass` - resource was applicable to a rule and the pattern passed evaluation
+* `skip` - Preconditions were not satisifed
+* `fail` - The resource failed the pattern evaluation
+* `warn` - Annotation `scored` has been set to `false`.
+* `error` - Variable substitution failed outside of preconditions
+
+Common scenarios resulting in a `skip`:
+
+1. Preconditions Not Met
+2. Policy Exceptions
+3. Conditional Anchors `()` with Unmet Conditions
+4. Global Anchors `<()` with Unmet Conditions
+5. Anchor Logic Resulting in Skip
+
+## PolicyExceptions
+
+PolicyExceptions are disabled by default. To enable them, set `enablePolicyException` flag to `true`. You also must set the `exceptionNamespace` flag.
+
+![alt text](image-3.png)
+
+Example:
+
+```yaml
+apiVersion: kyverno.io/v2
+kind: PolicyException
+metadata:
+  name: delta-exception
+  namespace: delta
+spec:
+  exceptions:
+  - policyName: disallow-host-namespaces
+    ruleNames:
+    - host-namespaces
+    - autogen-host-namespaces
+  match:
+    any:
+    - resources:
+        kinds:
+        - Pod
+        - Deployment
+        namespaces:
+        - delta
+        names:
+        - important-tool*
+  conditions:
+    any:
+    - key: "{{ request.object.metadata.labels.app || '' }}"
+      operator: Equals
+      value: busybox
+```
+
+Since these are just another CRD their use can and SHOULD be controlled by a number of different mechanisms:
+
+* Kubernetes RBAC
+* Specific Namespace for PolicyExceptions (see Container Flags)
+* Existing GitOps governance processes
+* Kyverno validate rules
+* YAML manifest validation
+
+## Kyverno Metrics
+
+Kyverno can expose metrics on port 8000. In Helm that is:
+
+```yaml
+<controller>:
+  metricsService:
+    create: true
+```
+
+You can congiure ports and type of service via the same values.
+
+### Configuring the metrics
+
+You can tweak which namespaces to exclude from exposure of metrics via `metricsExposure` section in `metricsConfig`.
 
 </details>
