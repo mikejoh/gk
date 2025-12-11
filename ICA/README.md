@@ -379,6 +379,39 @@ helm install istiod istio/istiod --namespace istio-system --set profile=ambient 
 helm install ztunnel istio/ztunnel -n istio-system --wait
 ```
 
+### Upgrade using helm
+
+In contrast to sidecar mode, ambient mode supports moving application pods to an upgraded ztunnel proxy without mandatory restart or reschedule of running application pods. Istio does not support canary upgrades of ztunnel.
+
+Use blue/green node pools instead to limimt blast radius.
+
+Ambient mode are split into two components that needs to be upgraded:
+
+* ztunnel
+* gateways
+
+#### Upgrade control plane
+
+1. `istiod` upgrade:
+
+```bash
+helm install istiod-"$REVISION" istio/istiod -n istio-system --set revision="$REVISION" --set profile=ambient --wait
+```
+
+#### Upgrade data plane
+
+1. Upgrade `ztunnel`:
+
+```
+helm upgrade ztunnel istio/ztunnel -n istio-system --set revision="$REVISION" --wait
+```
+
+2. Upgrade gateways and waypoints:
+
+```
+helm template istiod istio/istiod -s templates/revision-tags-mwc.yaml --set revisionTags="{$MYTAG}" --set revision="$REVISION" -n istio-system | kubectl apply -f -
+```
+
 ### Deployment Models
 
 Before we deploy Istio to production we need to answer a number of questions:
@@ -439,6 +472,212 @@ kubectl label namespace <namespace> istio-injection-
 * Using Resilience Features (circuit breaking, failover, outlier detection, timeouts, retries)
 * Using Fault Injection
 
+## Istios Architecture
+
+An Istio service mesh consists of the following components:
+
+* **data plane** - a set of intelligent proxies (Envoy) that are deployed as sidecars to the services in the mesh. Mediates and controls all network communication between microservices.
+* **control plane** - manages and configures the proxies to route traffic.
+
+![alt text](image-4.png)
+
+## Traffic Managment Overview
+
+Istios traffic routing rules let you easily control the flow of traffic and API calls between services. Istio simplifies configuration of service-level properties like circuit breakers, timeouts and retries. This makes it easy to set up tasks like:
+
+* A/B testing
+* Canary rollouts
+* Staged rollouts
+* Percentage-based traffic split
+
+The traffic management model **relies** on the Envoy proxies that are deployed along with your services. By **default** Envoy proxies distribute the traffic across each service load balancing pool using a **least requests model**, where each request is routed to the host with fewer active requests.
+
+Istio are using Kubernetes CRDs to configure traffic management:
+
+* `VirtualService`
+* `DestinationRule`
+* `Gateway`
+* `ServiceEntry`
+* `SideCar`
+
+### Virtual services
+
+Virtual service along with destination rules are the key **building blocks** of Istio's traffic routing functionality. A virtual service lets you **configure how requests are routed to a service** within an Istio service mesh. You can specify traffic behavior for one or more hostnames.
+
+Different versions of a service are specified as subsets.
+
+They also lets you:
+
+* Address multiple services through a single virtual service.
+* Configure traffic rules in combination with gateways.
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: reviews
+spec:
+  hosts:
+  # short name resolvable by Kubernetes or FQDN, use '*' for a single routing rule matching all services.
+  # Can be used to model traffic for virtual hosts that dont have routable entries inside the mesh.
+  # Istio adds a domain suffix to the hostnames when resolving them. This below only works in the same namespace.
+  - reviews 
+  http: # routing rules, match conditions and actions for routing HTTP/1.1, HTTP2 and gRPC traffic.
+  - match:
+    - headers:
+        end-user: # all requests from user 'jason'
+          exact: jason
+    route:
+    - destination: # must be a real destination that exists in Istios service registry.
+        host: reviews
+        subset: v2
+  - route:
+    - destination: # must be a real destination that exists in Istios service registry.
+        host: reviews
+        subset: v3
+```
+
+The second rule above dont have any matches, this means it will be a catch-all rule that matches all requests not matched by previous rules. The precedence is top-down.
+
+Remember that:
+
+* If you have **multiple** match conditions to the same `match` block the conditions are ANDed together.
+* If you have **multiple** `match` blocks in the same rule they are ORed together.
+
+Example:
+
+```yaml
+  http:
+  # rules
+  - match: # the matches are ORed together
+    - uri:
+        prefix: /ratings
+    match:
+    # these conditions of a match are ANDed together
+    - uri:
+        prefix: /reviews
+    - headers:
+        end-user: # all requests from user 'jason'
+          exact: jason
+    route:
+    - destination:
+        host: reviews
+```
+
+### Destination rules
+
+Subsets are defined based on labels that are attached to objects such as Pods.
+
+Destination rule example with stting different load balancing policies:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: my-destination-rule
+spec:
+  host: my-svc
+  trafficPolicy:
+    loadBalancer:
+      simple: RANDOM
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+  - name: v2
+    labels:
+      version: v2
+    trafficPolicy:
+      loadBalancer:
+        simple: ROUND_ROBIN
+  - name: v3
+    labels:
+      version: v3
+```
+
+### Service Entries
+
+You use a Service Entry to add an entry to the service registry that Istio maintains internally. After you add the service entry, the Envoy proxies can send traffic to the services as if it was a service in your mesh. Configuring service entries allows you to manage traffic for serivces running outside of the mesh.
+
+Here you can define:
+
+* Redirects
+* Retries, timeouts and fault injection policies for external destinations.
+* Run a mesh service in a VM
+
+Example that adds ext-svc.example.com external dependency to Istios service registry:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: svc-entry
+spec:
+  hosts:
+  - ext-svc.example.com
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  location: MESH_EXTERNAL
+  resolution: DNS
+```
+
+### Gateways
+
+Use a Gatway to manage inbound and outbound traffic for your mesh, specify which traffic you want to enter or leave the mesh.
+
+Instead of having all L4-7 traffic the Gateway does not handle the Layer 7 configuration. Instead this is done in the Virtual Service which is bound to the Gateway.
+
+Gateways are primarily used to handle ingress traffic, but can also be used for egress traffic.
+
+Gateway example:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: ext-host-gwy
+spec:
+  selector:
+    app: my-gateway-controller
+  servers:
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    hosts:
+    - ext-host.example.com
+    tls:
+      mode: SIMPLE
+      credentialName: ext-host-cert
+```
+
+Stich the Gateway to a Virtual Service:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: virtual-svc
+spec:
+  hosts:
+  - ext-host.example.com
+  gateways:
+  - ext-host-gwy
+```
+
+### Sidecars
+
+By default Istio configures every Envoy proxy to accept traffic on all the ports of its associated workload.
+
+* Fine-tune the set of ports and protocols that an Envoy proxy accepts
+* Limit the set of services that the Envoy proxy can reach.
+
+TODO: <https://istio.io/latest/docs/concepts/traffic-management/#network-resilience-and-testing>
+
+## Configuring Ingress and Egress traffic
+
 </details>
 
 <details>
@@ -469,10 +708,12 @@ Istio provides two very valuable commands to help diagnose traffic managment con
 `istioctl proxy-status`, gives you an overview of your mesh. If one of your sidecars isn't receiving configuration or is out of sync then `proxy-status` will tell you this:
 
 ```
+
 istioctl proxy-status
 NAME                                                   CLUSTER        CDS                LDS                EDS                RDS                ECDS        ISTIOD                             VERSION
 bookinfo-gateway-istio-596c696f5-htrsh.default         Kubernetes     SYNCED (15m)       SYNCED (15m)       SYNCED (9m21s)     SYNCED (15m)       IGNORED     istiod-6b7f596479-l4k9h            1.26.0
 curl-5946dc98d7-95ndm.test-ns                          Kubernetes     SYNCED (9m21s)     SYNCED (9m21s)     SYNCED (9m21s)     SYNCED (9m21s)     IGNORED     istiod-canary-7bf647c6cb-s9qh8     1.26.0
+
 ```
 
 To explain the output please see: <https://www.envoyproxy.io/docs/envoy/latest/intro/arch_overview/operations/dynamic_configuration>.
