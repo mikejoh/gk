@@ -674,9 +674,155 @@ By default Istio configures every Envoy proxy to accept traffic on all the ports
 * Fine-tune the set of ports and protocols that an Envoy proxy accepts
 * Limit the set of services that the Envoy proxy can reach.
 
-TODO: <https://istio.io/latest/docs/concepts/traffic-management/#network-resilience-and-testing>
+### Network resilience
+
+As well as helping you direct traffic around the mesh Istio provides opt-in failure recovery and fault injection features.
+
+#### Timeouts
+
+The amount of time that an Envoy proxy should wait for replies from a given service. Envoy timeout for HTTP requests are disabled in Istio by default. You can se a per-service timeout setting:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings
+spec:
+  hosts:
+  - ratings
+  http:
+  - route:
+    - destination:
+        host: ratings
+        subset: v1
+    timeout: 10s
+```
+
+#### Retries
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings
+spec:
+  hosts:
+  - ratings
+  http:
+  - route:
+    - destination:
+        host: ratings
+        subset: v1
+    retries:
+      attempts: 3
+      perTryTimeout: 2s
+```
+
+#### Circuit breakers
+
+Another useful mechanism Istio provides for creating resilient microservice-based applications. When the threshold is reached the circuit breaker trips and all requests to the service will fail immediately for a specified period of time. Configured in `DestinationRule`:
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: reviews
+spec:
+  host: reviews
+  subsets:
+  - name: v1
+    labels:
+      version: v1
+    trafficPolicy:
+      connectionPool:
+        tcp:
+          maxConnections: 100
+```
+
+#### Fault injection
+
+Introduces errors into a system to ensure that it can withstand and recover from error conditions. Useful to ensure that your failure recovery policies arent incompatible or too restrictive.
+
+_Cannot be combined with retry or timeout configuration!_
+
+Two types of faults are supported:
+
+* Delays
+* Aborts
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: ratings
+spec:
+  hosts:
+  - ratings
+  http:
+  - fault:
+      delay:
+        percentage:
+          value: 0.1
+        fixedDelay: 5s
+    route:
+    - destination:
+        host: ratings
+        subset: v1
+```
 
 ## Configuring Ingress and Egress traffic
+
+To configure egress gateway for HTTP traffic you need to start with creating a `ServiceEntry` to allow direct traffic to an external service.
+
+1. Defina a `ServiceEntry` to allow traffic to the external service.
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: ServiceEntry
+metadata:
+  name: cnn
+spec:
+  hosts:
+  - edition.cnn.com
+  ports:
+  - number: 80
+    name: http-port
+    protocol: HTTP
+  - number: 443
+    name: https
+    protocol: HTTPS
+  resolution: DNS
+```
+
+2. Verify that your `ServiceEntry` was applied correctly by sending an HTTP request to it.
+
+3. Create a `Gateway` resource to configure the egress gateway.
+
+```yaml
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: istio-egressgateway
+spec:
+  selector:
+    istio: egressgateway
+  servers:
+  - port:
+      number: 80
+      name: http
+      protocol: HTTP
+    hosts:
+    - edition.cnn.com
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: egressgateway-for-cnn
+spec:
+  host: istio-egressgateway.istio-system.svc.cluster.local
+  subsets:
+  - name: cnn
+```
 
 </details>
 
