@@ -32,6 +32,7 @@ The exam is delivered online and consists of performance-based tasks (problems) 
 * <https://istio.io/latest/docs/>
 * <https://killercoda.com/ica>
 * <https://killercoda.com/istio>
+* Mock exam: <https://docs.google.com/forms/d/e/1FAIpQLSfD4BLLQfdUwnIyiTBSGC_OzmSbiyrIlNp5Am61fTOhRbfiLw/viewform>
 
 ## Topics
 
@@ -800,7 +801,7 @@ spec:
 
 ```yaml
 apiVersion: networking.istio.io/v1
-kind: Gateway
+kind: Gateway 
 metadata:
   name: istio-egressgateway
 spec:
