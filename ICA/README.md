@@ -33,6 +33,9 @@ The exam is delivered online and consists of performance-based tasks (problems) 
 * <https://killercoda.com/ica>
 * <https://killercoda.com/istio>
 * Mock exam: <https://docs.google.com/forms/d/e/1FAIpQLSfD4BLLQfdUwnIyiTBSGC_OzmSbiyrIlNp5Am61fTOhRbfiLw/viewform>
+* Mesh Week: <https://github.com/solo-io/mesh-week>
+* Allowed resources during the exam: <<https://docs.linuxfoundation.org/tc-docs/certification/certification-resources-allowed#istio-certified-associate-ica>
+* <https://kodekloud.com/blog/istio-certified-associate-ica-study-guide/>
 
 ## Topics
 

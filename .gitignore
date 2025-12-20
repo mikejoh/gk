@@ -1,2 +1,5 @@
 lint.txt
 CBA/files/github-secret.yaml
+.vscode/
+.idea/
+**/istio*
