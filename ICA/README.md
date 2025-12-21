@@ -89,7 +89,7 @@ _I'll be using `minikube` throughout this exam prep._
 minikube start -p istio-test
 ```
 
-2. Install Istio CLI, version `1.26` since this is the version installed in the exam environment.
+1. Install Istio CLI, version `1.26` since this is the version installed in the exam environment.
 
 ```bash
 curl -L https://istio.io/downloadIstio | ISTIO_VERSION=1.26.0 sh -
@@ -170,15 +170,15 @@ With `helm` you install the components separately. This allows for more granular
 helm install istio-base istio/base -n istio-system --set defaultRevision=default --create-namespace
 ```
 
-2. Optionally install the Istio CNI chart.
+1. Optionally install the Istio CNI chart.
 
-3. Install the discovery chart:
+2. Install the discovery chart:
 
 ```bash
 helm install istiod istio/istiod -n istio-system --wait
 ```
 
-4. Optionally install an ingress gateway:
+1. Optionally install an ingress gateway:
 
 ```bash
 helm install istio-ingress istio/gateway -n istio-ingress --wait
@@ -285,13 +285,13 @@ helm install istiod-canary istio/istiod \
     -n istio-system
 ```
 
-4. Verify:
+1. Verify:
 
 ```
 kubectl get pods -l app=istiod -L istio.io/rev -n istio-system
 ```
 
-5. If you're using Istio gateways, install a canary revision of the Gateway chart:
+1. If you're using Istio gateways, install a canary revision of the Gateway chart:
 
 ```
 helm install istio-ingress-canary istio/gateway \
@@ -299,20 +299,20 @@ helm install istio-ingress-canary istio/gateway \
     -n istio-ingress
 ```
 
-6. Stable revision labels:
+1. Stable revision labels:
 
 ```
 helm template istiod istio/istiod -s templates/revision-tags-mwc.yaml --set revisionTags="{prod-stable}" --set revision=1-27-1 -n istio-system | kubectl apply -f -
 helm template istiod istio/istiod -s templates/revision-tags-mwc.yaml --set revisionTags="{prod-canary}" --set revision=1-28-1 -n istio-system | kubectl apply -f -
 ```
 
-7. Change the `prod-stable` tag to point to the canary revision when you're ready:
+1. Change the `prod-stable` tag to point to the canary revision when you're ready:
 
 ```
 helm template istiod istio/istiod -s templates/revision-tags-mwc.yaml --set revisionTags="{prod-stable}" --set revision=1-28-1 -n istio-system | kubectl apply -f -
 ```
 
-8. Set the default tag to point to the new revision:
+1. Set the default tag to point to the new revision:
 
 ```
 helm template istiod istio/istiod -s templates/revision-tags-mwc.yaml --set revisionTags="{default}" --set revision=1-28-1 -n istio-system | kubectl apply -f -
@@ -326,13 +326,13 @@ helm template istiod istio/istiod -s templates/revision-tags-mwc.yaml --set revi
 helm upgrade istio-base istio/base -n istio-system
 ```
 
-2. Upgrade the Istio discovery chart:
+1. Upgrade the Istio discovery chart:
 
 ```
 helm upgrade istiod istio/istiod -n istio-system
 ```
 
-3. (Optional) Upgrade any gateway charts installed in your cluster:
+1. (Optional) Upgrade any gateway charts installed in your cluster:
 
 ```
 helm upgrade istio-ingress istio/gateway -n istio-ingress
@@ -349,7 +349,7 @@ kubectl get crd gateways.gateway.networking.k8s.io &> /dev/null || \
 kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
 ```
 
-2. Install Istio in ambient mode:
+1. Install Istio in ambient mode:
 
 ```bash
 istioctl install --set profile=ambient --skip-confirmation
@@ -370,7 +370,7 @@ kubectl get crd gateways.gateway.networking.k8s.io &> /dev/null || \
 kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.4.0/experimental-install.yaml
 ```
 
-2. Install control plane:
+1. Install control plane:
 
 ```bash
 helm install istiod istio/istiod --namespace istio-system --set profile=ambient --wait
@@ -410,7 +410,7 @@ helm install istiod-"$REVISION" istio/istiod -n istio-system --set revision="$RE
 helm upgrade ztunnel istio/ztunnel -n istio-system --set revision="$REVISION" --wait
 ```
 
-2. Upgrade gateways and waypoints:
+1. Upgrade gateways and waypoints:
 
 ```
 helm template istiod istio/istiod -s templates/revision-tags-mwc.yaml --set revisionTags="{$MYTAG}" --set revision="$REVISION" -n istio-system | kubectl apply -f -
@@ -798,9 +798,9 @@ spec:
   resolution: DNS
 ```
 
-2. Verify that your `ServiceEntry` was applied correctly by sending an HTTP request to it.
+1. Verify that your `ServiceEntry` was applied correctly by sending an HTTP request to it.
 
-3. Create a `Gateway` resource to configure the egress gateway.
+2. Create a `Gateway` resource to configure the egress gateway.
 
 ```yaml
 apiVersion: networking.istio.io/v1
@@ -837,6 +837,173 @@ spec:
 * Configuring Authentication (mTLS, JWT)
 * Securing Edge Traffic with TLS
 
+## Configuring Authorization
+
+Istio authorization feature provide mesh, namespace and workload wide access control for you workloads in the mesh.
+
+The authorization policy enforces access control to the inbound traffic in the server side Envoy proxy. Each Envoy proxy runs an authorization engine that authorizes requests at runtime. REsult can be `ALLOW` or `DENY`.
+
+![alt text](image-6.png)
+
+Authorization policies is a CRD, it includes **selector**, **action** and **rules** fields.
+
+* `selector` - specifies the target of the policy.
+* `action` - specifies whether to `ALLOW` or `DENY` access.
+* `rules` - specifies when to trigger the action.
+  * `from` - sources of the request
+  * `to` - operations of the requests
+  * `when` - conditions needed to apply the rule
+
+Example, allows two sources to access with the `app: httpbin` and `version: v1` labels in the `foo` namespace when requests sent have a **valid** JWT token:
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+ name: httpbin
+ namespace: foo
+spec:
+ selector:
+   matchLabels:
+     app: httpbin
+     version: v1
+ action: ALLOW
+ rules:
+ - from:
+   - source:
+       principals: ["cluster.local/ns/default/sa/curl"]
+   - source:
+       namespaces: ["dev"]
+   to:
+   - operation:
+       methods: ["GET"]
+   when:
+   - key: request.auth.claims[iss]
+     values: ["https://accounts.google.com"]
+```
+
+Example on denying a namespace:
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+ name: httpbin-deny
+ namespace: foo
+spec:
+ selector:
+   matchLabels:
+     app: httpbin
+     version: v1
+ action: DENY
+ rules:
+ - from:
+   - source:
+       notNamespaces: ["foo"]
+```
+
+_It is a good security practice to start with the allow-nothing policy and incrementally add more ALLOW policies to open more access to the workload._
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-nothing
+spec:
+  action: ALLOW
+  # the rules field is not specified, and the policy will never match.
+```
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: deny-all
+spec:
+  action: DENY
+  # the rules field has an empty rule, and the policy will always match.
+  rules:
+  - {}
+```
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: allow-all
+spec:
+  action: ALLOW
+  # This matches everything.
+  rules:
+  - {}
+```
+
+To allow only authenticated users set `"*"`  as the value for `principals`.
+
+## Configuring Authentication
+
+Istio provides two types of authentication:
+
+* Peer auth, used for service-to-service authentication to verify the client making the connection. Istio offers mutual TLS (mtls) as a full stack solution for transport auth.
+* Request auth, used for end-user authentication to verify credential attached to the request. Istio enables request-level authentication with JSON Web Token (JWT) validation.
+
+Istio stores the authentication policies in the `Istio config store` as CRD. Istiod keeps the up-to-date for each proxy.
+
+Istio tunnels service-to-service communication through the client and server-side PEPs, which are implemented as Envoy proxies.
+
+![alt text](image-5.png)
+
+To speciy **client-side** mTLS you use a `DestinationRule`:
+
+```yamlapiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: reviews-mtls
+spec:
+  host: reviews
+  trafficPolicy:
+    tls:
+      mode: ISTIO_MUTUAL
+```
+
+To specify **server-side** mTLS you use a `PeerAuthentication` resource:
+
+```yaml
+apiVersion: security.istio.io/v1
+kind: PeerAuthentication
+metadata:
+  name: "example-peer-policy"
+  namespace: "foo"
+spec:
+  selector:
+    matchLabels:
+      app: reviews
+  mtls:
+    mode: STRICT
+```
+
+`mode` can be one of the following: `DISABLE`, `PERMISSIVE`, `STRICT`.
+
+Permissive mode allows both mTLS and plain text traffic, adding flexibility for the onboarding process.
+
+Strict is strict mTLS enforcement.
+
+`RequestAuthentication` is another CRD that defines how JWT tokens should be validated.
+
+The `selector` field is important:
+
+* Empty `selector` field: **mesh-wide policy**
+* Empty or not but specified `namespace` field: **namespace-wide policy**
+* Specified `namespace` field with non-empty `selector` field: **workload-specific policy**
+
+The `RequestAuthentication` policies specify the values needed to validate a JSON Web Token (JWT):
+
+* The location of the token in the request
+* The issuer or the request
+* The public JSON Web Key Set (JWKS)
+
+```yaml
+
 </details>
 
 <details>
@@ -849,7 +1016,7 @@ spec:
 Istio provides two very valuable commands to help diagnose traffic managment configuration pleoblems, the `proxy-status` and `proxy-config` commands.
 
 * `proxy-status` command allows you to get an overview of your mesh and identify the proxy causing the problem.
-* `proxy-config` command can be used to inspect Envoy configuration
+* `proxy-config` command cakn be used to inspect Envoy configuration
 
 ## Troubleshooting Configuration
 
@@ -882,5 +1049,10 @@ And the synced statuses:
 * `STALE` - Istiod **has** sent an update to Envoy but has not received an acknowledgement. Indicates a **networking issue** between Envoy and Istiod. Or a bug with Istio itself.
 
 ## Troubleshooting the Mesh Data Plane
+
+* `istioctl analyze` Finding configuration errors automatically.
+* `istioctl dashboard envoy` Viewing the raw Envoy config (clusters, listeners, routes) via a GUI.
+* `tcpdump` Capturing raw packets if you suspect the issue is below the proxy layer.
+* **Kiali** Visualizing the graph to see exactly which edge is showing "red" traffic.
 
 </details>
