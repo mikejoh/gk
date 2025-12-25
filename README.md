@@ -18,7 +18,7 @@ Certifications covered in this repository:
 6. [CBA (Certified Backstage Associate)](CBA/README.md)
 7. [KCA (Kyverno Certified Associate)](KCA/README.md)
 8. [ICA (Istio Certified Associate)](ICA/README.md) - **not only multi-choice questions, also includes performance-based questions**
-9. LFCS (Linux Foundation Certified System Administrator)
+9. [LFCS (Linux Foundation Certified System Administrator)](LFCS/README.md) - **performance based!**
 10. CNPA (Cloud Native Platform Engineering Associate) - **needed after the 15th of October 2025!**
 
 The order of the certificates above are the exact order i will (or have) taken the exams.

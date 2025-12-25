@@ -1,6 +1,6 @@
 # Istio Certified Administrator
 
-_This exam is an online, proctored, performance-based AND multiple-choice exam._
+_This exam is an online, proctored and performance-based exam._
 
 ## Exam details
 
