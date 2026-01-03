@@ -1,0 +1,7 @@
+#cloud-config
+
+password: secret
+chpasswd: {expire: False}
+ssh_pwauth: True
+ssh_authorized_keys:
+  - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGWf8CwLWR5QJiHXRfgdCJLHUuYYMytxjZbnZxU77mwR ubuntu 

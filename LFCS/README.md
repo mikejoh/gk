@@ -9,6 +9,39 @@ _This exam is an online, proctored and performance-based exam._
 
 ## Resources
 
+* Killer Coda scenarios: <https://killercoda.com/pawelpiwosz/course/linuxFundamentals>
+
+## Creating a local Ubuntu server for practice
+
+_Note that this can be done on any Linux distribution supporting `libvirt` and `virt-install`, but there's a million different ways of starting up a small lab environment!_
+
+1. Create a new SSH key pair for cloud-init user 'ubuntu':
+
+```bash
+ssh-keygen -t ed25519 -C "ubuntu" -f ~/.ssh/ubuntu
+cat ~/.ssh/ubuntu.pub
+```
+
+_Don't forget to paste the public key content to `user-data` file provided here in `cloud-init/user-data`!_
+
+1. Download the Ubuntu Cloud image, i downloaded 24.04 LTS from here: <https://cloud-images.ubuntu.com/noble/>
+
+```bash
+
+1. Start the VM with `virt-install`:
+
+```bash
+virt-install --name ubuntu01 \
+  --memory 2048 \
+  --os-variant detect=on,name=ubuntunoble \
+  --disk size=10,backing_store="$(pwd)/noble-server-cloudimg-amd64.img",bus=virtio \
+  --cloud-init user-data="$(pwd)/user-data",meta-data="$(pwd)/meta-data",network-config="$(pwd)/network-config" \
+  --network network=default,model=virtio \
+  --graphics none
+```
+
+## Topics
+
 <details>
   <summary>Operations Deployment (25%)</summary>
 
@@ -20,6 +53,14 @@ _This exam is an online, proctored and performance-based exam._
 * Manage Virtual Machines (libvirt)
 * Configure container engines, create and manage containers
 * Create and enforce MAC using SELinux
+
+## Configure kenrnel parameters, persistent and non-persistent
+
+```bash
+sysctl -w net.ipv4.ip_forward=1                     # Set non-persistent kernel parameter
+echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf  # Set persistent kernel parameter
+sysctl -p                                           # Apply changes from sysctl.conf
+```
 
 </details>
 

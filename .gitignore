@@ -3,3 +3,5 @@ CBA/files/github-secret.yaml
 .vscode/
 .idea/
 **/istio*
+**/*.iso
+**/*.img
