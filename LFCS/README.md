@@ -57,9 +57,51 @@ virt-install --name ubuntu01 \
 ## Configure kenrnel parameters, persistent and non-persistent
 
 ```bash
+sysctl net.ipv4.ip_forward                          # Check current value
+sysctl -n net.ipv4.ip_forward                       # Check current value (numeric only)
 sysctl -w net.ipv4.ip_forward=1                     # Set non-persistent kernel parameter
 echo "net.ipv4.ip_forward = 1" >> /etc/sysctl.conf  # Set persistent kernel parameter
 sysctl -p                                           # Apply changes from sysctl.conf
+```
+
+## Diagnose, identify, manage, and troubleshoot processes and services
+
+```bash
+ps -aux
+pgrep -a cron
+nice -n 10 <command>
+systemctl status <service_name>
+systemctl start <service_name>
+systemctl stop <service_name>
+systemctl restart <service_name>
+systemctl list-units --type=service --state=running
+systemctl list-unit-files --type=service --state=disabled
+systemctl cat ssh.service
+```
+
+## Manage or schedule jobs for executing commands
+
+```bash
+crontab -l
+crontab -e
+systemctl list-timers --all
+```
+
+## Search for, install, validate, and maintain software packages or repositories
+
+```bash
+apt update
+apt upgrade
+apt install <package_name>
+dpkg -l | grep <package_name>
+dpkg -i <package_file>.deb
+```
+
+## Recover from hardware, operating system, or filesystem failures
+
+```bash
+journalctl -p err # severity level er
+journalctl -b     # logs from current boot
 ```
 
 </details>
