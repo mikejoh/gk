@@ -104,6 +104,10 @@ journalctl -p err # severity level er
 journalctl -b     # logs from current boot
 ```
 
+## Create and enforce MAC using SELinux
+
+```bash
+
 </details>
 
 <details>
@@ -118,6 +122,26 @@ journalctl -b     # logs from current boot
 * Configure bridge and bonding devices
 * Implement reverse proxies and load balancers
 
+## Configure packet filtering, port redirection, and NAT
+
+```bash
+iptables -A INPUT -s 172.16.238.187 -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -j DROP
+iptables -A PREROUTING -i eth0 -t nat -p tcp --dport 6000 -j REDIRECT --to-port 6001
+```
+
+## Configure the OpenSSH server and client
+
+Check configuration:
+
+```bash
+sshd -T | grep -i X11Forwarding
+```
+
+`Match User` and `Match Group` are possible to use when filtering and matching on users and groups in the SSH config!
+
+Files in `sshd_config.d` are loaded in lexical (alphabetical) order, then call a file `99_` to make sure it's loaded first.
+
 </details>
 
 <details>
@@ -130,6 +154,49 @@ journalctl -b     # logs from current boot
 * Configure and manage swap space
 * Configure filesystem automounters
 * Monitor storage performance
+
+## Configure and manage LVM storage
+
+```
+PV = Physical Volume - physical storage device, hard drive. /dev/sdb. pvcreate!
+VG = Volume Group - storage pool, combines multiple PVs. vgcreate <my pool> /dev/sdb /dev/sdc
+LV = Logical Volume - the usuable partition, a slice taken from the VG, format this with a filesystem like ext4. lvcreate -L 10G -n <my pool> <my pool>.
+```
+
+Flow:
+
+1. `pvcreate /dev/sdb`
+2. `vgcreate vg_data /dev/sdb /dev/sdc`
+3. `lvcreate -L 10G -n lv_projects vg_data`
+4. `mkfs -t ext4 /dev/vg_data/lv_projects`
+5. Mount!
+
+Use `pvdisplay`, `vgdisplay` and `lvdisplay`.
+
+Use PE extents instead of megabytes:
+
+```bash
+lvcreate -l 100%FREE -n lv_data vg_data
+```
+
+```bash
+sudo pvcreate /dev/vdc                     # create physical volume
+sudo vgcreate data_vg /dev/vdc             # create volume group
+sudo lvcreate -L 5G -n data_lv data_vg     # create logical volume
+sudo lvextend -L +2G /dev/data_vg/data_lv  # extend logical volume
+sudo lvreduce -L -1G /dev/data_vg/data_lv  # reduce logical volume
+sudo vgextend data_vg /dev/vdd             # extend volume group
+sudo vgreduce data_vg /dev/vdd             # reduce volume group
+```
+
+## Create, manage, and troubleshoot filesystems
+
+```bash
+sudo mkfs -t ext4 /dev/vdb # format disk
+sudo mkdir /mnt/data     # create mount point
+sudo mount /dev/vdb /mnt/data # mount disk
+sudo rm -rf /mnt/backup001/.trash/* # remove files
+```
 
 </details>
 
