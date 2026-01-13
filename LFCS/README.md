@@ -286,11 +286,25 @@ lscpu               # check CPU information
 lspci               # check PCI devices
 ```
 
-systemctl list-dependencies
+Before checking a file system for errors, we need to unmount it!
+
+```bash
+sudo xfs_repair -v /dev/sdb1
+```
+
+```bash
+sudo fsck.ext4 -v -f -p /dev/vdb2 # use -p
+```
+
+`systemctl list-dependencies` to see dependencies of a service.
 
 ## Create and enforce MAC using SELinux
 
-selinux is a kernel module, enabled by default.
+selinux is a kernel module, enabled by default. Needs a bit of configuration to work properly on Ubuntu:
+
+```bash
+sudo selinux-activate # then reboot
+```
 
 ```bash
 ls -lZ
@@ -310,6 +324,143 @@ sudo audit2allow --all -M mymodule
 ```
 
 To make `setenforce` persistent, edit `/etc/selinux/config` and set `SELINUX=enforcing` or `permissive`. Then you need to reboot.
+
+To change context:
+
+```bash
+sudo chcon -u unconfined_u /var/log/auth.log # change user context
+sudo chcon -r unconfined_u /var/log/auth.log # change role context
+sudo chcon -t unconfined_u /var/log/auth.log # change type context
+```
+
+Check:
+
+```bash
+seinfo -u
+seinfo -r
+seinfo -t
+```
+
+Copy contexts from another similar file:
+
+```bash
+sudo chcon --reference=/var/log/dmesg /var/log/auth.log
+```
+
+How about new files and directories? Restore context with data from the database where the info is stored about certain files and dirs:
+
+```bash
+sudo restorecon -R /var/www # only restores the label
+```
+
+To `restorecon` all labels pass the `-F` flag!
+
+Future proofing to survive reinstalls/reboots:
+
+```bash
+sudo semanage fcontext --add --type var_log_t "/var/www/10`
+sudo semanage fcontext --list # show regexp
+sudo semanage fcontext --add --type nfs_t "/nfs/share(/.*)?"
+sudo restorecon -R /nfs/
+```
+
+Instead of only configuring type definitions we can use booleans:
+
+```bash
+sudo setsebool virt_use_nfs 1 # allow virt to use nfs
+sudo semanage port --list | grep ssh
+ssh_port_t                     tcp      22
+sudo semanage port --add --type ssh_port_t --proto tcp 2222 # add port 2222 for ssh
+ssh_port_t                     tcp      2222, 22
+```
+
+## Manage Virtual Machines (libvirt)
+
+`virsh` - manage VMS from the CLI.
+
+```bash
+virsh list --all
+virsh reset TestMachine
+virsh shutdown TestMachine
+virsh destroy TestMachine # unplug the power
+virsh undefine TestMachine # remove the VM definition
+```
+
+Use `virsh help <command>` to get help on a specific command.
+
+```bash
+virsh autostart TestMachine # enable autostart
+virsh autostart --disable TestMachine # disable autostart
+virsh dominfo TestMachine # get info about the VM
+```
+
+Domain == VM.
+
+Update the TestMachine to have 2 CPUs, power off and restart to make sure it sticks:
+
+```bash
+virsh setvcpus TestMachine 2 --config # update config
+virsh setvcpus TestMachine 2 --config --maximum # update live VM
+```
+
+Change memory:
+
+```bash
+virsh setmaxmem TestMachine 4G --config # set max memory
+virsh setmem TestMachine 2G --config # set current memory
+# shutdown + destroy + start to apply changes
+```
+
+Use `qemu-img` to resize and get info about disk images:
+
+```bash
+qemu-img info /var/lib/libvirt/images/TestMachine.qcow2 # get info about the disk image
+qemu-img resize /var/lib/libvirt/images/TestMachine.qcow2 10G # resize the disk image
+```
+
+Use `virt-intall` to create new VMs:
+
+```bash
+virt-install --name TestMachine --ram 2048 --vcpus 2 --disk
+```
+
+Use `--import` to import existing image with OS installed, we're not installing a new OS!
+
+Full example:
+
+```bash
+virt-install \
+  --osinfo ubuntu24.04 \
+  --name ubuntu1 \
+  --memory 2048 \
+  --vcpus 1 \
+  --import \
+  --disk /var/lib/libvirt/images/ubuntu24.04.img \
+  --graphics none
+```
+
+use `detect=on` to detect the OS variant automatically.
+
+Set the root password:
+
+```bash
+virt-customize -a /var/lib/libvirt/images/ubuntu24.04.img --root-password password:mysecretpassword
+```
+
+To install a OS on a Virtual Machine:
+
+```bash
+virt-install \
+  --osinfo detect=on \
+  --name omarchy01 \
+  --memory 2048 \
+  --vcpus 2 \
+  --disk size=25 \
+  --location  \
+  --graphics none \
+  --network network=default,model=virtio \
+  --extra-args "console=ttyS0"
+```
 
 </details>
 
@@ -423,5 +574,108 @@ sudo rm -rf /mnt/backup001/.trash/* # remove files
 * Configure user resource limits
 * Configure and manage ACLs
 * Configure the system to use LDAP user and group accounts
+
+## Create and manage local user and group accounts
+
+```bash
+sudo adduser john # interactive
+sudo passwd john # set password
+sudo deluser john --remove-home john # delete user and home dir
+sudo adduser --shell /bin/bash --home /home/john john
+cat /etc/passwd | grep john # check user info
+id # check user id and group id
+whoami # check current user
+sudo adduser --system --no-create-home sysacc # create system account
+```
+
+To change `john`'s details later on:
+
+```bash
+sudo usermod --home /home/newhome --move-home john
+sudo usermod --login jane john # change username
+sudo usermod --shell /bin/zsh john # change shell
+sudo usermod --lock jane # lock account
+```
+
+Change age of password:
+
+```bash
+sudo chage -l john # list password info
+sudo chage --lastday 0 john # force password change on next login
+sudo chage --lastday -1 john # remove forced password change
+sudo chage --maxdays 30 john # set max days before password change
+```
+
+### Groups
+
+```bash
+sudo groupadd developers
+sudo gpasswd --add john developers
+sudo gpasswd --delete john developers
+sudo usermod -g developers john # change primary group
+sudo groupmod --new-name programmers developers
+```
+
+## Manage personal and system-wide environment profiles
+
+```bash
+printenv # print environment variables
+env # print environment variables
+```
+
+Change `/etc/environment` for system-wide environment variables.
+
+Top run a command on login add a script to `/etc/profile.d/`!
+
+### Manage templates
+
+Use /etc/skel/ to copy default files to new users home directories!
+
+## Configure user resource limits
+
+Change the `/etc/security/limits.conf` file!
+
+`domain` can be:
+
+* username
+* @groupname
+* * (all users)
+
+`type` can be:
+
+* `soft` (soft limit)
+* `hard` (hard limit) not overwriteable!
+* `-` (both)
+
+`item` can be:
+
+* `core` (core file size in blocks)
+* `data` (data seg size in KB)
+* `fsize` (file size in blocks)
+* `memlock` (max locked memory in KB)
+* `nofile` (number of open files)
+* `nproc` (number of processes)
+* `rss` (resident set size in KB)
+
+`value` is the limit value.
+
+`ulimit -a` to see current limits.
+
+## Configure and manage ACLs
+
+```bash
+groups
+```
+
+```bash
+sudo gpasswd -a john sudo
+```
+
+Change `sudoers` file with `visudo`!
+```
+%sudo   ALL=(ALL:ALL) ALL
+```
+
+Means all hosts, all users, all commands.
 
 </details>
