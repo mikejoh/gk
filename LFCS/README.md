@@ -10,6 +10,8 @@ _This exam is an online, proctored and performance-based exam._
 ## Resources
 
 * Killer Coda scenarios: <https://killercoda.com/pawelpiwosz/course/linuxFundamentals>
+* Make sure you use the LFCS simulator exams in Killer Shell to practice!
+* If you want a course, check out this: <https://www.udemy.com/course/linux-foundation-certified-systems-administrator-lfcs> or through KodeKloud!
 
 ## Creating a local Ubuntu server for practice
 
@@ -41,6 +43,61 @@ virt-install --name ubuntu01 \
 ```
 
 ## Topics
+
+<details>
+  <summary>Fundamentals!</summary>
+
+This is not a exam topic but rather a place to put important fundamental commands and knowledge that might or might not be directly asked in the exam, but is important to know!
+
+## Hard and Soft links
+
+Inode numbers are used to track data, where pieces of data are stored and also metadata. the file points at the inode number and the inode number points at the data. The Links count in `stat` will be 1 since it's a single file pointing at the inode, the number is a hard link.
+
+`ln path_to_target_file path_to_link_file`
+
+Stored once accessed from multiple locations. When all hard links are deleted the data is deleted, or marked as overwriteable.
+
+You can only hard link to files on the same filesystem.
+
+The permissions to a soft link doesn't matter.
+
+`ln -s path_to_target_file path_to_link_file`, note the `l` in the output of `ls -l` for soft links.
+
+## File and directory permissions
+
+`chgrp` to change group ownership of a file or directory.
+`groups` to see which groups a user is in.
+
+Permission identifiers:
+
+```
+d = directory
+- = regular file
+l = symbolic link
+s = socket
+p = pipe
+b = block device
+```
+
+SUID, a special permission that allows users to run an executable with the permissions of the executable's owner.
+SGID, applies on both executable and directories.
+Sticky Bit, restrict file deletion in that director besides the file owner, directory owner and root.
+
+## Finding files and directorires
+
+```bash
+-mtime -2
+-mtime +2
+-mtime 2
+-newermt "-2 hours"
+```
+
+```bash
+sudo find /usr -type f -newermt "-2 hours"
+sudo find /usr -size +5M -size -10M
+```
+
+</details>
 
 <details>
   <summary>Operations Deployment (25%)</summary>
@@ -77,6 +134,93 @@ systemctl restart <service_name>
 systemctl list-units --type=service --state=running
 systemctl list-unit-files --type=service --state=disabled
 systemctl cat ssh.service
+
+systemctl edit --full ssh.service
+systemctl revert ssh.service
+
+systemctl reload ssh.service
+systemctl reload-or-restart ssh.service
+
+systemctl mask atd.service # prevent a service from starting if another service depends on it
+```
+
+### Processes
+
+```
+ps -a #uses the UNIX 
+ps a #BSD
+```
+
+Process within `[]` are kernel processes, internally.
+
+`ps -U username` to see processes for a specific user.
+`ps 1` to see processes for a specific PID.
+
+Niceness ranges from -20 (highest priority) to 19 (lowest priority).
+
+`nice -n ll bash`
+`ps lax` long listing with extra details.
+
+`ps fax` to see process tree.
+`ps faux` to see process tree with user information.
+
+0-19 can only be set by users, root can set -20 to 19.
+
+Change niceness of running process with `renice`:
+
+```
+bash
+ps fax
+# get PID
+renice 7 <PID>
+```
+
+Note the log! You cannot renice a process to a higher priority than it already has unless you are root.
+
+Signals:
+
+```bash
+kill -L # list signals
+kill -SIGHUP <PID> # send SIGHUP to process
+```
+
+To kill a process we can:
+
+```bash
+kill -SIGKILL
+kill -KILL
+kill -9 <PID>
+```
+
+Backgound and foreground processes:
+
+```bash
+sleep 180 # wait for 3 minutes
+```
+
+Ctrl+Z # suspend process
+
+```bash
+bg %1 # resume in background
+fg %1 # resume in foreground
+```
+
+```
+sleep 300 & # start in background
+```
+
+Use `lsof` to see open files and which processes are using them!
+
+Logs:
+
+```bash
+journalctl /usr/bin/sudo # view logs for specific binary
+journalctl -u ssh.service # view logs for specific service
+journalctl -f # follow logs in real-time
+journalctl -S "2024-06-01 12:00:00" -U "2024-06-01 14:00:00" # logs between specific time range
+journalctl -p err -g "failed" # logs with specific priority and matching a pattern
+journalctl -b 0 # logs from current boot
+journalctl -b -1 # logs from previous boot
 ```
 
 ## Manage or schedule jobs for executing commands
@@ -86,6 +230,36 @@ crontab -l
 crontab -e
 systemctl list-timers --all
 ```
+
+Cron:
+
+* Minute
+* Hour
+* Day of month
+* Month
+* Day of week
+
+Anacron:
+
+* Period in days
+* Delay in minutes
+
+at:
+
+* for tasks that only run once
+
+Check syntax of `cron` file with `cat /etc/crontab`.
+
+For `anacron` check `/etc/anacrontab`. Four fields:
+
+* Period in days
+* Delay in minutes
+* Job identifier
+* Command to run
+
+`anacron -T` to test without running jobs.
+
+For `at` use `atq` to list jobs, `atrm <job_number>` to remove a job.
 
 ## Search for, install, validate, and maintain software packages or repositories
 
@@ -104,9 +278,38 @@ journalctl -p err # severity level er
 journalctl -b     # logs from current boot
 ```
 
+```bash
+df -h               # check disk space
+free -h             # check memory usage
+uptime              # check system load
+lscpu               # check CPU information
+lspci               # check PCI devices
+```
+
+systemctl list-dependencies
+
 ## Create and enforce MAC using SELinux
 
+selinux is a kernel module, enabled by default.
+
 ```bash
+ls -lZ
+ps axZ
+sestatus
+getenforce
+setenforce 0  # permissive
+setenforce 1  # enforcing
+id -Z
+semanage -u # list SELinux users
+```
+
+```bash
+sudo audit2why --all | grep ssh
+sudo audit2allow --all -M mymodule
+# then install the module in selinux with semodule -i mymodule.pp
+```
+
+To make `setenforce` persistent, edit `/etc/selinux/config` and set `SELINUX=enforcing` or `permissive`. Then you need to reboot.
 
 </details>
 
