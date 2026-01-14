@@ -476,7 +476,87 @@ virt-install \
 * Configure bridge and bonding devices
 * Implement reverse proxies and load balancers
 
+## Configure IPv4 and IPv6 networking and hostname resolution
+
+```bash
+sudo netplan get # get current netplan config
+ls /etc/netplan/ # list netplan config files
+sudo cat /etc/netplan.d/99-cloud-init.yaml # view specific netplan config file
+sudo netplan apply # apply changes
+```
+
+```yaml
+network:
+  version: 2
+  ethernets:
+    enp0s8:
+      dhcp4: false
+      dhcp6: false
+      addresses:
+        - 10.0.0.9/24
+      nameservers:
+        addresses:
+          - 8.8.4.4
+          - 8.8.8.8
+      routes:
+        - to: 192.168.0.0/24
+          via: 10.0.0.100
+```
+
+```bash
+sudo netplan try --timeout 30 # test netplan config with rollback
+```
+
+## Set and synchronize system time using time servers
+
+```bash
+resolvectl status
+sudo vim /etc/systemd/resolved.conf # set DNS servers globally
+sudo systemctl restart systemd-resolved.service
+```
+
+## Configure bridge and bonding devices
+
+Bridge between networks.
+Bond tie multiple network interfaces into a single logical interface for redundancy or increased throughput.
+
+Bonding modes:
+
+* mode=0 (balance-rr) - round-robin
+* mode=1 (active-backup) - active-backup
+* mode=2 (balance-xor) - XOR
+* mode=3 (broadcast) - broadcast
+* mode=4 (802.3ad) - LACP
+* mode=5 (balance-tlb) - adaptive transmit load balancing
+* mode=6 (balance-alb) - adaptive load balancing
+
 ## Configure packet filtering, port redirection, and NAT
+
+```bash
+sudo ufw status
+sudo ufw allow 22/tcp
+sudo ufw status verbose
+sudo ufw status numbered
+sudo ufw delete 1
+```
+
+### Port Redirection
+
+![alt text](image.png)
+
+PREROUTING table is used to alter packets as they arrive.
+
+To make iptables rules persistent across reboots install `iptables-persistent` package:
+
+```bash
+sudo apt install iptables-persistent
+sudo netfilter-persistent save
+sudo iptables --list-rules --table nat # view nat table rules
+sudo iptables --flush --table nat # start over
+man ufw-framework # search for PREROUTING to find the example, add the source!
+```
+
+### Various iptables examples
 
 ```bash
 iptables -A INPUT -s 172.16.238.187 -p tcp --dport 80 -j ACCEPT
@@ -496,6 +576,34 @@ sshd -T | grep -i X11Forwarding
 
 Files in `sshd_config.d` are loaded in lexical (alphabetical) order, then call a file `99_` to make sure it's loaded first.
 
+## Implement reverse proxies and load balancers
+
+`nginx` example:
+
+```bash
+server {
+    listen 80;
+    server_name example.com;
+
+    location / {
+        proxy_pass http://backend_servers;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+```bash
+nginx -t # test config
+```
+
+Enable sites:
+
+```bash
+sudo ln -s /etc/nginx/sites-available/reverse_proxy.conf /etc/nginx
+```
+
 </details>
 
 <details>
@@ -509,12 +617,137 @@ Files in `sshd_config.d` are loaded in lexical (alphabetical) order, then call a
 * Configure filesystem automounters
 * Monitor storage performance
 
+## Manage and configure the virtual file system
+
+Use `lsblk` to see block devices:
+
+```bash
+NAME    MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+sr0      11:0    1 1024M  0 rom
+vda     253:0    0   10G  0 disk
+├─vda1  253:1    0    9G  0 part /
+├─vda14 253:14   0    4M  0 part
+├─vda15 253:15   0  106M  0 part /boot/efi
+└─vda16 259:0    0  913M  0 part /boot
+```
+
+List partitions with `fdisk`:
+
+```bash
+sudo fdisk --list /dev/sda
+```
+
+Use `cfdisk` to create partitions on a disk interactively!
+
+If you have a running VM you can add a new disk to with the following steps:
+
+```bash
+sudo virsh attach-device your_vm_name /path/to/newdisk.xml --persistent
+# newdisk.xml example
+<disk type='file' device='disk'>
+  <driver name='qemu' type='qcow2'/>
+  <source file='/var/lib/libvirt/images/newdisk.qcow2'/>
+  <target dev='vdb' bus='virtio'/>
+</disk>
+sudo virsh attach-device ubuntu01 newdisk.xml --persistent
+```
+
+And then check with `lsblk` again to see the new disk, after that run `sudo cfdisk /dev/vdb` to create a new partition on the disk.
+
 ## Configure and manage LVM storage
 
 ```
 PV = Physical Volume - physical storage device, hard drive. /dev/sdb. pvcreate!
 VG = Volume Group - storage pool, combines multiple PVs. vgcreate <my pool> /dev/sdb /dev/sdc
 LV = Logical Volume - the usuable partition, a slice taken from the VG, format this with a filesystem like ext4. lvcreate -L 10G -n <my pool> <my pool>.
+```
+
+Use `lvmdiskscan` to see available LVM physical volumes:
+
+```bash
+  /dev/vda16 [     913.00 MiB]
+  /dev/vda1  [      <9.00 GiB]
+  /dev/vda14 [       4.00 MiB]
+  /dev/vda15 [     106.00 MiB]
+  /dev/vdc   [       5.00 GiB]
+  /dev/vdd   [       5.00 GiB]
+  /dev/vde   [       5.00 GiB]
+  3 disks
+  4 partitions
+  0 LVM physical volume whole disks
+  0 LVM physical volumes
+```
+
+Create PVs:
+
+```bash
+sudo pvcreate /dev/vdc /dev/vdd
+sudo pvs
+PV         VG Fmt  Attr PSize PFree
+/dev/vdc      lvm2 ---  5.00g 5.00g
+/dev/vdd      lvm2 ---  5.00g 5.00g
+```
+
+Add PVs to VG:
+
+```bash
+sudo vgcreate data_vg /dev/vdc /dev/vdd
+Volume group "data_vg" successfully created
+```
+
+Extebd VG with new PV:
+
+```bash
+sudo pvcreate /dev/vde
+sudo vgextend data_vg /dev/vde
+Volume group "data_vg" successfully extended
+```
+
+Check VGs:
+
+```bash
+sudo vgs
+VG      #PV #LV #SN Attr   VSize   VFree
+data_vg   3   0   0 wz--n- <14.99g <14.99g
+```
+
+Reduce the VG:
+
+```bash
+sudo vgreduce data_vg /dev/vde
+  Removed "/dev/vde" from volume group "data_vg"
+ubuntu@ubuntu01:~$ sudo vgs
+  VG      #PV #LV #SN Attr   VSize VFree
+  data_vg   2   0   0 wz--n- 9.99g 9.99g
+```
+
+Remove PV:
+
+```bash
+sudo pvremove /dev/vde
+```
+
+Create LV:
+
+```bash
+ubuntu@ubuntu01:~$ sudo lvcreate --size 6G --name partition2 data_vg
+  Logical volume "partition2" created.
+ubuntu@ubuntu01:~$ sudo lvs
+  LV         VG      Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  partition2 data_vg -wi-a----- 6.00g
+ubuntu@ubuntu01:~$ sudo lvresize --extents 100%VG data_vg/partition2
+  Size of logical volume data_vg/partition2 changed from 6.00 GiB (1536 extents) to 9.99 GiB (2558 extents).
+  Logical volume data_vg/partition2 successfully resized.
+ubuntu@ubuntu01:~$ sudo lvs
+  LV         VG      Attr       LSize Pool Origin Data%  Meta%  Move Log Cpy%Sync Convert
+  partition2 data_vg -wi-a----- 9.99g
+```
+
+Resize if filesystem is ext4:
+
+```bash
+sudo lvresize --resizefs --size 3G /dev/data_vg/partition2
+sudo resize2fs /dev/data_vg/partition2
 ```
 
 Flow:
@@ -543,6 +776,19 @@ sudo vgextend data_vg /dev/vdd             # extend volume group
 sudo vgreduce data_vg /dev/vdd             # reduce volume group
 ```
 
+## Configure and manage swap space
+
+_Assumes you have a VM with an extra disk `/dev/vdb` attached, see above sections!_
+
+```bash
+sudo mkswap /dev/vdb3  # create swap on partition
+sudo swapon /dev/vdb3  # enable swap
+sudo swapoff /dev/vdb3 # disable swap
+sudo swapon --show     # show active swap
+```
+
+A file can be used as SWAP!
+
 ## Create, manage, and troubleshoot filesystems
 
 ```bash
@@ -551,6 +797,85 @@ sudo mkdir /mnt/data     # create mount point
 sudo mount /dev/vdb /mnt/data # mount disk
 sudo rm -rf /mnt/backup001/.trash/* # remove files
 ```
+
+## Configure filesystem automounters
+
+```bash
+sudo mount /dev/vdb1 /mnt/
+sudo umount /mnt/
+```
+
+Use `/etc/fstab` to make mounts persistent across reboots! Example:
+
+```bash
+/dev/vdb1 /backup ext4 defaults 0 2
+```
+
+And then reboot!
+
+Use `findmnt` to see mounted filesystems:
+
+```bash
+sudo findmnt -t ext4
+TARGET    SOURCE     FSTYPE OPTIONS
+/         /dev/vda1  ext4   rw,relatime,seclabel,discard,errors=remount-ro,commit=30
+├─/backup /dev/vdb1  ext4   rw,relatime,seclabel
+└─/boot   /dev/vda16 ext4   rw,relatime,seclabel
+```
+
+Mount a read only filesystem:
+
+```bash
+sudo mount -o ro /dev/vdb2 /mnt/
+```
+
+Mount with read-only, no executions allowed and no suid bits:
+
+```bash
+sudo mount -o ro,nosuid,noexec /dev/vdb2 /mnt/
+```
+
+Use `remount` to change mount options on the fly:
+
+```bash
+sudo mount -o remount,rw /mnt/
+```
+
+## Use remote filesystems and network block devices
+
+After changing `/etc/exports` on the NFS server run:
+
+```bash
+sudo exportfs -r # re-export
+```
+
+Install NBD server:
+
+```bash
+sudo apt install nbd-server
+```
+
+then open up the `/etc/nbd-server/config` file and add:
+
+```plaintext
+[generic]
+  allowlist = true
+
+[partition2]
+  exportname = /dev/vdb2
+```
+
+## Monitor storage performance
+
+Install `sysstat` package to get `iostat` command:
+
+```bash
+sudo apt install sysstat
+```
+
+`iostat` is used to monitor system input/output device loading by observing the time the devices are active in relation to their average transfer rates.
+
+`pidstat` is used to monitor individual tasks currently being managed by the Linux kernel.
 
 </details>
 
@@ -672,6 +997,7 @@ sudo gpasswd -a john sudo
 ```
 
 Change `sudoers` file with `visudo`!
+
 ```
 %sudo   ALL=(ALL:ALL) ALL
 ```
