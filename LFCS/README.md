@@ -530,6 +530,12 @@ Bonding modes:
 * mode=5 (balance-tlb) - adaptive transmit load balancing
 * mode=6 (balance-alb) - adaptive load balancing
 
+Check examples here:
+
+```
+ls -l /usr/share/doc/netplan/examples/*
+```
+
 ## Configure packet filtering, port redirection, and NAT
 
 ```bash
@@ -558,10 +564,32 @@ man ufw-framework # search for PREROUTING to find the example, add the source!
 
 ### Various iptables examples
 
+Port redirection:
+
 ```bash
-iptables -A INPUT -s 172.16.238.187 -p tcp --dport 80 -j ACCEPT
-iptables -A INPUT -j DROP
-iptables -A PREROUTING -i eth0 -t nat -p tcp --dport 6000 -j REDIRECT --to-port 6001
+sudo iptables -t nat -A PREROUTING -p tcp --dport 8080 -j REDIRECT --to-port 80
+sudo iptables -t nat -A PREROUTING -s 192.168.0.0/24 -p tcp --dport 9080 -j REDIRECT --to-port 8080
+```
+
+Default blocking policy:
+
+```bash
+iptables -P INPUT DROP
+```
+
+Common allow rules:
+
+```bash
+iptables -A INPUT -p tcp --dport 22 -j ACCEPT
+iptables -A INPUT -p tcp --dport 80 -j ACCEPT
+iptables -A INPUT -i lo -j ACCEPT
+```
+
+Common block rules:
+
+```bash
+iptables -A INPUT -s 192.168.1.50 -j DROP
+iptables -A INPUT -s 10.0.0.0/24 -j REJECT
 ```
 
 ## Configure the OpenSSH server and client
@@ -770,7 +798,7 @@ lvcreate -l 100%FREE -n lv_data vg_data
 sudo pvcreate /dev/vdc                     # create physical volume
 sudo vgcreate data_vg /dev/vdc             # create volume group
 sudo lvcreate -L 5G -n data_lv data_vg     # create logical volume
-sudo lvextend -L +2G /dev/data_vg/data_lv  # extend logical volume
+sudo lvextend -L +2G /dev/data_vg/data_lv  # extend logical volume with 2GB + the already allocated size
 sudo lvreduce -L -1G /dev/data_vg/data_lv  # reduce logical volume
 sudo vgextend data_vg /dev/vdd             # extend volume group
 sudo vgreduce data_vg /dev/vdd             # reduce volume group
